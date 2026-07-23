@@ -1,6 +1,6 @@
 /* Chudridez service worker — offline app shell + runtime tile/data caching.
    Bump CACHE_VERSION whenever you deploy index.html or data.js. */
-const CACHE_VERSION = 'chudridez-v2';
+const CACHE_VERSION = 'chudridez-v3';
 const APP_SHELL = `${CACHE_VERSION}-shell`;
 const RUNTIME   = `${CACHE_VERSION}-runtime`;
 
@@ -10,7 +10,6 @@ const SHELL_URLS = [
   './',
   './index.html',
   './data.js',
-  './search-core.js',
   './manifest.json',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'
