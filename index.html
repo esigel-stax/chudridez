@@ -15,7 +15,7 @@
     --safer:#3bbf83; --moderate:#f2a541; --caution:#e8543f; --chron:#2bc4c9;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:#0b1119;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden}
+  html,body{margin:0;height:100%;background:#0b1119;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;overflow:hidden;overscroll-behavior:none;-webkit-text-size-adjust:100%}
   #map{position:absolute;inset:0}
   .maplibregl-popup-content{background:var(--glass2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.5;box-shadow:0 12px 40px rgba(0,0,0,.5)}
   .maplibregl-popup-tip{display:none}
@@ -139,9 +139,36 @@
   .vignette{position:absolute;inset:0;z-index:2;pointer-events:none;box-shadow:inset 0 0 200px 30px rgba(0,0,0,.55)}
   /* warm up map controls */
   .maplibregl-ctrl-scale{background:rgba(33,20,13,.7)!important;color:#f6ecd9!important;border-color:var(--line)!important;border-radius:4px}
+  /* pins + bucket list */
+  .pinbtn{display:inline-block;margin-top:8px;font:600 11px Inter;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink);cursor:pointer}
+  .pinbtn:hover{border-color:var(--accent)}
+  .cardpin{position:absolute;top:8px;right:8px;background:none;border:none;font-size:15px;cursor:pointer;opacity:.85;line-height:1}
+  .cardpin:hover{opacity:1;transform:scale(1.15)}
+  .card{position:relative}
+  .bucketlist{display:flex;flex-direction:column;gap:7px}
+  .bkt-empty{font-size:11.5px;color:var(--muted);line-height:1.5;padding:2px}
+  .bkt{background:rgba(255,209,102,.07);border:1px solid rgba(255,209,102,.28);border-radius:11px;padding:9px 10px}
+  .bkt-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .bkt-name{font:600 12.5px 'Fraunces',serif;color:#ffe9c7}
+  .bkt-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px}
+  .bkt-x:hover{color:var(--caution)}
+  .bkt-meta{font-size:10.5px;color:var(--muted);margin:3px 0 5px}
+  .bkt-stop{display:inline-block;font-size:10.5px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:6px;padding:2px 6px;margin:0 4px 4px 0}
+  .bkt-stop b{cursor:pointer;color:var(--muted);margin-left:3px}
+  .bkt-stop b:hover{color:var(--caution)}
+  .bkt-actions{display:flex;gap:6px;margin-top:3px}
+  .bkt-actions button{flex:1;font:600 10.5px Inter;padding:6px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);cursor:pointer}
+  .bkt-actions button:hover{border-color:var(--accent)}
+  .stoppicker{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;width:min(360px,92vw);max-height:70vh;overflow-y:auto;
+    background:var(--glass2);backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .sp-hd{position:sticky;top:0;background:var(--glass2);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);font:600 13px 'Fraunces',serif}
+  .sp-hd #spClose{cursor:pointer;color:var(--muted);font-size:16px}
+  .sp-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;cursor:pointer;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .sp-item:hover{background:rgba(255,209,102,.12)}
+  .sp-d{font-size:10.5px;color:var(--muted);white-space:nowrap}
   .panel-toggle{display:none}
   .sheet-handle{display:none}
-  @media (max-width:720px){
+  @media (max-width:820px){
     /* compact title */
     .titlecard{top:10px;left:10px;right:auto;max-width:64vw;padding:9px 12px}
     .titlecard .tag,.titlecard .stats{display:none}
@@ -212,6 +239,10 @@
       </div>
     </div>
     <div class="grp">
+      <div class="lbl">🪣 My bucket list</div>
+      <div id="bucketList" class="bucketlist"></div>
+    </div>
+    <div class="grp">
       <div class="lbl">View</div>
       <div class="modebtns">
         <button class="modebtn on" id="btnMap">Map</button>
@@ -246,6 +277,7 @@
 
 <div class="legend" id="legend"></div>
 <div class="status" id="status"></div>
+<div class="stoppicker" id="stopPicker" hidden></div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="data.js"></script>
@@ -265,9 +297,15 @@
 
   function milesNum(s){ const n=String(s).match(/\d+/g); if(!n) return 0; const a=n.map(Number); return (a.length>=2 && /\d+\s*[-–]\s*\d+/.test(String(s)))?(a[0]+a[1])/2:a[0]; }
   function status(msg){ const el=document.getElementById('status'); if(!msg){el.classList.remove('show');return;} el.textContent=msg; el.classList.add('show'); }
-  const isMobile=()=>window.matchMedia('(max-width:720px)').matches;
+  const isMobile=()=>window.matchMedia('(max-width:820px)').matches;
   function openSheet(){ if(isMobile()){ const p=document.getElementById('panel'); if(p) p.classList.add('open'); } }
   function closeSheet(){ if(isMobile()){ const p=document.getElementById('panel'); if(p) p.classList.remove('open'); } }
+  // ---- bucket list (pinned rides + food detours), persisted in the browser ----
+  function attr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+  let bucket = (()=>{ try{ return JSON.parse(localStorage.getItem('chud_bucket')||'{}'); }catch(e){ return {}; } })();
+  function saveBucket(){ try{ localStorage.setItem('chud_bucket',JSON.stringify(bucket)); }catch(e){} }
+  function isPinned(n){ return !!bucket[n]; }
+  function togglePin(n){ if(bucket[n]){ delete bucket[n]; if(customView===n) clearCustom(); } else { bucket[n]={stops:[]}; } saveBucket(); renderBucket(); renderList(); }
 
   // ---------- base style ----------
   const style={
@@ -335,11 +373,21 @@
     map.addLayer({id:'top100-lbl',type:'symbol',source:'top100',layout:{visibility:'none','text-field':['to-string',['get','rank']],'text-font':['Noto Sans Bold'],'text-size':10,'text-allow-overlap':false},
       paint:{'text-color':'#042',"text-halo-color":'#bfe9ff','text-halo-width':1.1}});
 
+    // custom (bucket) route with food detours — drawn on demand
+    map.addSource('custom',{type:'geojson',data:fc([])});
+    map.addLayer({id:'custom-line',type:'line',source:'custom',layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#ffd166','line-width':6,'line-opacity':.95,'line-dasharray':[1.4,1.1]}});
+
     applyFilters(); renderList(); wireUI(); buildLegend();
     fitAll();
-    setMode('3d');   // open in 3D terrain by default
+    setMode(isMobile()?'map':'3d');   // phones open flat (3D is heavy/disorienting on mobile)
     addDecor();
+    renderBucket();
     snapToRoads();
+    // keep the GL canvas sized correctly on phones / rotation
+    setTimeout(()=>map.resize(),300);
+    window.addEventListener('resize',()=>map.resize());
+    window.addEventListener('orientationchange',()=>setTimeout(()=>map.resize(),400));
   });
 
   // ---------- cute bike icons at each route start ----------
@@ -366,7 +414,8 @@
     popup(lnglat,`<h3>${p.name}</h3><span class="badge" style="background:${SAFECOL[p.safety]}">${SAFETY[p.safety].label}</span>`+
       `<div class="meta">${p.region} · ${p.miles} mi · ${(+p.elev).toLocaleString()} ft climb · ~${rate} ft/mi · ${p.difficulty}</div>`+
       `<div class="sn">${p.why}</div><div class="sn"><b>Safety:</b> ${p.safetyNote}</div>`+
-      `<a href="${p.url}" target="_blank" rel="noopener">View route / GPX →</a>`);
+      `<a href="${p.url}" target="_blank" rel="noopener">View route / GPX →</a><br>`+
+      `<button class="pinbtn" data-pin="${attr(p.name)}">${isPinned(p.name)?'✅ In your bucket':'🔖 Pin to bucket'}</button>`);
   }
   function foodHTML(p){ const t=FOOD_TYPES[p.type];
     return `<h3>${t.emoji} ${p.name}</h3><span class="badge" style="background:${t.color};color:#fff">${p.rank}</span>`+
@@ -451,12 +500,14 @@
     list.innerHTML=`<div class="count">${shown.length} route${shown.length===1?'':'s'} shown</div>`+shown.map(f=>{
       const p=f.properties, col=SAFECOL[p.safety];
       return `<div class="card" data-i="${p.i}" style="border-left-color:${col}">
+        <button class="cardpin" data-pin="${attr(p.name)}" title="Pin to bucket list">${isPinned(p.name)?'✅':'🔖'}</button>
         <h3>${p.name}</h3>
         <div class="meta"><span>${p.region}</span><span><b>${p.miles}</b> mi</span><span><b>${(+p.elev).toLocaleString()}</b> ft</span><span>${p.difficulty}</span></div>
         <span class="badge" style="background:${col}">${SAFETY[p.safety].label}</span>
         <p>${p.why}</p></div>`;
     }).join('') || '<div class="count">No routes match the filters.</div>';
-    list.querySelectorAll('.card').forEach(c=>c.addEventListener('click',()=>{
+    list.querySelectorAll('.card').forEach(c=>c.addEventListener('click',(e)=>{
+      if(e.target.closest('[data-pin]')) return; // pin handled by delegated listener
       const i=+c.dataset.i; closeSheet(); const pad=isMobile()?{top:70,left:40,right:40,bottom:90}:{top:80,left:80,right:360,bottom:80};
       map.fitBounds(routeBounds(i),{padding:pad,duration:900});
       const p=routeFeatures[i].properties; const mid=routeFeatures[i].geometry.coordinates[Math.floor(routeFeatures[i].geometry.coordinates.length/2)];
@@ -765,6 +816,108 @@
     clr.addEventListener('click',resetSearch);
     ex.querySelectorAll('b').forEach(b=>b.addEventListener('click',()=>{ q.value=b.dataset.q; go(); }));
   }
+
+  // ================= Bucket list: pinned rides + food-detour routing =================
+  let customView=null, customStopMarkers=[];
+  function haversineMi(aLng,aLat,bLng,bLat){ const R=3958.8,toR=x=>x*Math.PI/180; const dLat=toR(bLat-aLat),dLng=toR(bLng-aLng);
+    const s=Math.sin(dLat/2)**2+Math.cos(toR(aLat))*Math.cos(toR(bLat))*Math.sin(dLng/2)**2; return 2*R*Math.asin(Math.sqrt(s)); }
+  function minDistToPath(path,lng,lat){ let m=Infinity; for(const p of path){ const d=haversineMi(lng,lat,p[1],p[0]); if(d<m)m=d; } return m; }
+  function nearestIdx(path,lat,lng){ let bi=0,bd=Infinity; for(let i=0;i<path.length;i++){ const d=haversineMi(lng,lat,path[i][1],path[i][0]); if(d<bd){bd=d;bi=i;} } return bi; }
+
+  function renderBucket(){
+    const host=document.getElementById('bucketList'); if(!host) return;
+    const names=Object.keys(bucket);
+    if(!names.length){ host.innerHTML='<div class="bkt-empty">No saved rides yet. Tap 🔖 on any ride (list card or map popup) to add it — then build a route with food stops.</div>'; return; }
+    host.innerHTML=names.map(n=>{
+      const rt=ROUTES.find(r=>r.name===n); if(!rt) return '';
+      const b=bucket[n], stops=b.stops||[];
+      const miles=(b.miles!=null)?(b.miles.toFixed(1)+' mi'):(rt.miles+' mi');
+      return `<div class="bkt">
+        <div class="bkt-top"><div class="bkt-name">${n}</div><button class="bkt-x" data-bucket="remove" data-r="${attr(n)}" title="Remove">✕</button></div>
+        <div class="bkt-meta">${rt.region} · <b style="color:#ffe9c7">${miles}</b>${b.miles!=null?' with stops':''} · ${rt.difficulty}</div>
+        ${stops.length?('<div>'+stops.map((s,i)=>`<span class="bkt-stop">🍽️ ${s.name}<b data-bucket="delstop" data-r="${attr(n)}" data-i="${i}" title="remove stop">✕</b></span>`).join('')+'</div>'):''}
+        <div class="bkt-actions"><button data-bucket="view" data-r="${attr(n)}">View on map</button><button data-bucket="addstop" data-r="${attr(n)}">＋ Add food stop</button></div>
+      </div>`;
+    }).join('');
+  }
+
+  function nearbyFood(rt,n){
+    const cand=[];
+    foodFeatures.forEach(f=>{ const c=f.geometry.coordinates; cand.push({name:f.properties.name,lng:c[0],lat:c[1],emoji:FOOD_TYPES[f.properties.type].emoji}); });
+    topFeatures.forEach(f=>{ const c=f.geometry.coordinates; cand.push({name:f.properties.name,lng:c[0],lat:c[1],emoji:'⭐'}); });
+    if(recsLoaded) recsAll.forEach(f=>{ const c=f.geometry.coordinates; cand.push({name:f.properties.n,lng:c[0],lat:c[1],emoji:'🍽️'}); });
+    const seen=new Set();
+    return cand.map(c=>({...c,dist:minDistToPath(rt.path,c.lng,c.lat)}))
+      .filter(c=>{ if(seen.has(c.name))return false; seen.add(c.name); return c.dist<4; })
+      .sort((a,b)=>a.dist-b.dist).slice(0,n);
+  }
+
+  let pickRoute=null, pickCands=[];
+  function openStopPicker(r){
+    const rt=ROUTES.find(x=>x.name===r); if(!rt) return; pickRoute=r; pickCands=nearbyFood(rt,18);
+    const box=document.getElementById('stopPicker');
+    box.innerHTML='<div class="sp-hd">Add a stop to “'+r+'”<span id="spClose">✕</span></div>'+
+      (pickCands.length? pickCands.map((c,i)=>`<div class="sp-item" data-pick="1" data-idx="${i}"><span>${c.emoji} ${c.name}</span><span class="sp-d">${c.dist.toFixed(1)} mi off route</span></div>`).join('')
+       : '<div class="sp-item">No food within ~4 mi of this route. Turn on “All Chronicle recs” for more options.</div>');
+    box.hidden=false;
+  }
+  function addStopToRoute(r,idx){ const c=pickCands[idx]; if(!c||!bucket[r]) return; (bucket[r].stops=bucket[r].stops||[]).push({name:c.name,lng:c.lng,lat:c.lat}); saveBucket(); document.getElementById('stopPicker').hidden=true; recomputeRoute(r); }
+
+  function recomputeRoute(r){
+    const rt=ROUTES.find(x=>x.name===r); const stops=(bucket[r]&&bucket[r].stops)||[];
+    if(!stops.length){ bucket[r].miles=null; bucket[r].geom=null; saveBucket(); renderBucket(); if(customView===r) drawCustom(r); return; }
+    const path=rt.path.map(p=>[p[1],p[0]]);
+    const ordered=stops.map(s=>({s,idx:nearestIdx(rt.path,s.lat,s.lng)})).sort((a,b)=>a.idx-b.idx);
+    let coords=[], si=0;
+    for(let i=0;i<path.length;i++){ coords.push(path[i]); while(si<ordered.length&&ordered[si].idx===i){ coords.push([ordered[si].s.lng,ordered[si].s.lat]); si++; } }
+    while(si<ordered.length){ coords.push([ordered[si].s.lng,ordered[si].s.lat]); si++; }
+    status('Re-routing through your stops…');
+    fetch(`https://router.project-osrm.org/route/v1/driving/${coords.map(c=>c[0]+','+c[1]).join(';')}?overview=full&geometries=geojson`)
+      .then(x=>x.ok?x.json():null).then(j=>{ const ro=j&&j.routes&&j.routes[0];
+        if(ro){ bucket[r].miles=ro.distance/1609.34; bucket[r].geom=ro.geometry.coordinates; }
+        saveBucket(); renderBucket(); if(customView===r) drawCustom(r); status('');
+      }).catch(()=>{ bucket[r].geom=coords; bucket[r].miles=null; saveBucket(); renderBucket(); if(customView===r) drawCustom(r); status('Routing offline — showing direct detour.'); setTimeout(()=>status(''),2500); });
+  }
+
+  function clearStopMarkers(){ customStopMarkers.forEach(m=>m.remove()); customStopMarkers=[]; }
+  function clearCustom(){ customView=null; if(map.getSource('custom')) map.getSource('custom').setData(fc([])); clearStopMarkers(); }
+  function drawCustom(r){
+    const rt=ROUTES.find(x=>x.name===r); const b=bucket[r]||{};
+    const geom=b.geom||rt.path.map(p=>[p[1],p[0]]);
+    map.getSource('custom').setData({type:'FeatureCollection',features:[{type:'Feature',geometry:{type:'LineString',coordinates:geom},properties:{}}]});
+    clearStopMarkers();
+    (b.stops||[]).forEach(s=>{ const el=document.createElement('div'); el.textContent='🍽️';
+      el.style.cssText='font-size:20px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))';
+      customStopMarkers.push(new maplibregl.Marker({element:el}).setLngLat([s.lng,s.lat]).addTo(map)); });
+  }
+  function viewBucketRoute(r){
+    customView=r; drawCustom(r);
+    const b=bucket[r]||{}, rt=ROUTES.find(x=>x.name===r);
+    const geom=b.geom||rt.path.map(p=>[p[1],p[0]]);
+    const bnd=new maplibregl.LngLatBounds(); geom.forEach(c=>bnd.extend(c)); (b.stops||[]).forEach(s=>bnd.extend([s.lng,s.lat]));
+    map.fitBounds(bnd,{padding:fitPad(),duration:900});
+    const mid=geom[Math.floor(geom.length/2)], ns=(b.stops||[]).length;
+    const miles=(b.miles!=null)?(b.miles.toFixed(1)+' mi with '+ns+' stop'+(ns===1?'':'s')):(rt.miles+' mi');
+    popup(mid,`<h3>${r}</h3><span class="badge" style="background:#ffd166;color:#2a1608">Your custom ride</span>`+
+      `<div class="meta">${rt.region} · <b>${miles}</b> · ${rt.difficulty}</div>`+
+      `<div class="sn">${ns?('Stops: '+b.stops.map(s=>s.name).join(', ')):'No stops yet — tap “Add food stop” in your bucket list.'}</div>`);
+  }
+
+  // delegated clicks: pins, bucket actions, stop picker
+  document.addEventListener('click', e=>{
+    const pin=e.target.closest('[data-pin]');
+    if(pin){ e.stopPropagation(); const n=pin.getAttribute('data-pin'); togglePin(n);
+      if(pin.classList.contains('pinbtn')) pin.textContent=isPinned(n)?'✅ In your bucket':'🔖 Pin to bucket'; return; }
+    if(e.target.id==='spClose'){ document.getElementById('stopPicker').hidden=true; return; }
+    const pick=e.target.closest('[data-pick]'); if(pick){ addStopToRoute(pickRoute,+pick.getAttribute('data-idx')); return; }
+    const b=e.target.closest('[data-bucket]');
+    if(b){ e.stopPropagation(); const act=b.getAttribute('data-bucket'), r=b.getAttribute('data-r');
+      if(act==='remove'){ delete bucket[r]; if(customView===r) clearCustom(); saveBucket(); renderBucket(); renderList(); }
+      else if(act==='view'){ viewBucketRoute(r); closeSheet(); }
+      else if(act==='addstop'){ openStopPicker(r); }
+      else if(act==='delstop'){ const i=+b.getAttribute('data-i'); (bucket[r].stops||[]).splice(i,1); recomputeRoute(r); }
+    }
+  });
 })();
 </script>
 </body>
