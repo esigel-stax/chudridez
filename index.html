@@ -153,6 +153,17 @@
   .cardpin:hover{opacity:1;transform:scale(1.15)}
   .card{position:relative}
   .bucketlist{display:flex;flex-direction:column;gap:7px}
+  /* dedicated bucket-list page */
+  .bucketpage{position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;
+    background:linear-gradient(rgba(28,19,13,.94),rgba(28,19,13,.94)),radial-gradient(900px 600px at 18% -12%,#16463a,#0e0a07);
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+  .bp-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line);
+    font:600 19px 'Fraunces',serif;color:#ffe9c7;background:linear-gradient(90deg,rgba(232,176,75,.14),transparent)}
+  .bp-actions{display:flex;gap:8px}
+  .bp-hd .minibtn{font-size:12px;padding:6px 11px}
+  .bp-body{flex:1;overflow-y:auto;padding:18px;max-width:760px;width:100%;margin:0 auto}
+  .bp-body .bkt{padding:14px 16px}
+  .bp-body .bkt-name{font-size:15px}
   .bkt-empty{font-size:11.5px;color:var(--muted);line-height:1.5;padding:2px}
   .bkt{background:rgba(255,209,102,.07);border:1px solid rgba(255,209,102,.28);border-radius:11px;padding:9px 10px}
   .bkt-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -261,7 +272,7 @@
     </div>
   </div>
   <p class="tag">🌺 Search by vibe, ride by safety, eat by ranking. Pin a bucket list, add food stops, get turn-by-turn cues.</p>
-  <div class="stats"><span><b>79</b> routes</span><span><b>42</b> stops</span><span><b>1,274</b> Chronicle recs</span><span><b>5</b> regions</span></div>
+  <div class="stats"><span><b>87</b> routes</span><span><b>43</b> stops</span><span><b>1,274</b> Chronicle recs</span><span><b>5</b> regions</span></div>
 </div>
 <div class="panel" id="panel">
   <div class="sheet-handle" id="sheetHandle">🔎 Search &amp; filters</div>
@@ -284,8 +295,8 @@
       </div>
     </div>
     <div class="grp">
-      <div class="lbl">🪣 My bucket list <button id="shareBtn" class="minibtn">🔗 Share</button></div>
-      <div id="bucketList" class="bucketlist"></div>
+      <div class="lbl">🪣 My bucket list</div>
+      <button id="openBucket" class="modebtn on" style="width:100%">Open my bucket list  →</button>
     </div>
     <div class="grp">
       <div class="lbl">View</div>
@@ -294,6 +305,7 @@
         <button class="modebtn" id="btnSat">Satellite</button>
         <button class="modebtn" id="btn3d">3D terrain</button>
       </div>
+      <button id="installBtn" onclick="chudInstall()" class="modebtn" style="display:none;width:100%;margin-top:7px">⬇︎ Install Chudridez app</button>
     </div>
     <div class="grp">
       <div class="lbl">Sort routes</div>
@@ -335,8 +347,13 @@
     <div class="tm-hint">You don't need a token — tap Skip and just use ▶ Live nav.</div>
   </div>
 </div>
+<div class="bucketpage" id="bucketPage" hidden>
+  <div class="bp-hd"><span>🪣 My Bucket List</span><span class="bp-actions"><button id="shareBtn" class="minibtn">🔗 Share</button><button id="bpClose" class="minibtn">✕ Close</button></span></div>
+  <div class="bp-body"><div id="bucketList" class="bucketlist"></div></div>
+</div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="data.js?v=2"></script>
+<script src="search-core.js"></script>
+<script src="data.js?v=3"></script>
 <script>
 (function(){
   const SAFETY=window.SAFETY, ROUTES=window.ROUTES, RESTAURANTS=window.RESTAURANTS, FOOD_TYPES=window.FOOD_TYPES, CHRONICLE=window.CHRONICLE100||[];
@@ -421,7 +438,7 @@
     map.addSource('custom',{type:'geojson',data:fc([])});
     map.addLayer({id:'custom-line',type:'line',source:'custom',layout:{'line-cap':'round','line-join':'round'},
       paint:{'line-color':'#ffd166','line-width':6,'line-opacity':.95,'line-dasharray':[1.4,1.1]}});
-    applyFilters(); renderList(); wireUI(); buildLegend();
+    applyFilters(); renderList(); wireUI(); buildLegend(); applyURLState();
     fitAll();
     setMode(isMobile()?'map':'3d');   // phones open flat (3D is heavy/disorienting on mobile)
     addDecor();
@@ -451,11 +468,21 @@
   }
   // ---------- popups ----------
   function popup(lnglat,html){ new maplibregl.Popup({closeButton:true,maxWidth:'300px'}).setLngLat(lnglat).setHTML('<div class="pop">'+html+'</div>').addTo(map); }
+  function crashBadgeHTML(name){
+    const c=(window.CRASH_COUNTS||{})[name];
+    if(!c) return '';
+    const n=(typeof c==='number')?c:c.crashCount;
+    if(n==null) return '';
+    const ser=(typeof c==='object'&&c.seriousCount)||0;
+    const col=n>=15?'#e8543f':n>=5?'#f0a020':'#1a9850';
+    return `<div class="sn"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${col};margin-right:6px;vertical-align:middle"></span><b>${n}</b> reported crashes on this corridor${ser?(' &middot; '+ser+' serious/fatal'):''} <span style="opacity:.6">&middot; SWITRS/TIMS &middot; guidance only</span></div>`;
+  }
   function routePopup(p,lnglat){
     const rate=Math.round((+p.elev)/(milesNum(p.miles)||1));
     popup(lnglat,`<h3>${p.name}</h3><span class="badge" style="background:${SAFECOL[p.safety]}">${SAFETY[p.safety].label}</span>`+
       `<div class="meta">${p.region} · ${p.miles} mi · ${(+p.elev).toLocaleString()} ft climb · ~${rate} ft/mi · ${p.difficulty}</div>`+
       `<div class="sn">${p.why}</div><div class="sn"><b>Safety:</b> ${p.safetyNote}</div>`+
+      crashBadgeHTML(p.name)+
       `<a href="${p.url}" target="_blank" rel="noopener">View route / GPX →</a><br>`+
       `<button class="pinbtn" data-pin="${attr(p.name)}">${isPinned(p.name)?'✅ In your bucket':'🔖 Pin to bucket'}</button> `+
       `<button class="pinbtn" data-nav="${attr(p.name)}">🧭 Directions</button> `+
@@ -523,7 +550,7 @@
     const topVis=state.top100?'visible':'none';
     map.setLayoutProperty('top100','visibility',topVis); map.setLayoutProperty('top100-lbl','visibility',topVis);
     if(state.top100){ const tf=['in',['get','region'],regs]; map.setFilter('top100',tf); map.setFilter('top100-lbl',tf); }
-    applyRecsFilter();
+    applyRecsFilter();    syncURL();
   }
   // ---------- route list ----------
   function routeBounds(i){ const b=new maplibregl.LngLatBounds(); routeFeatures[i].geometry.coordinates.forEach(c=>b.extend(c)); return b; }
@@ -587,6 +614,46 @@
     document.querySelectorAll('#safetyPills .pill').forEach(p=>p.classList.toggle('off',!state.safety.has(p.dataset.k)));
     document.querySelectorAll('#foodPills .pill').forEach(p=>p.classList.toggle('off',!state.food.has(p.dataset.k)));
   }
+  // ---------- deep-link URL state (shareable, reload-safe) ----------
+  let urlApplied=false;
+  function syncURL(){
+    if(!urlApplied) return;                 // don't clobber the URL before we've read it
+    try{
+      const p=new URLSearchParams();
+      const q=document.getElementById('q'); if(q&&q.value.trim()) p.set('q',q.value.trim());
+      if(state.mode!=='3d') p.set('view',state.mode);
+      const safKeys=Object.keys(SAFETY), foodKeys=Object.keys(FOOD_TYPES);
+      if(state.region.size!==regions.length) p.set('reg',[...state.region].map(r=>regions.indexOf(r)).join('.'));
+      if(state.safety.size!==safKeys.length) p.set('saf',[...state.safety].map(s=>safKeys.indexOf(s)).join('.'));
+      if(state.food.size!==foodKeys.length)  p.set('food',[...state.food].map(f=>foodKeys.indexOf(f)).join('.'));
+      if(state.top100) p.set('top100','1');
+      if(state.all) p.set('recs','1');
+      if(state.guide) p.set('guide',state.guide);
+      const cur=new URLSearchParams(location.search); if(cur.get('l')) p.set('l',cur.get('l')); // keep bucket-share param
+      const qs=p.toString();
+      history.replaceState(null,'',location.pathname+(qs?('?'+qs):''));
+    }catch(e){}
+  }
+  function applyURLState(){
+    if(urlApplied) return; urlApplied=true;
+    try{
+      const p=new URLSearchParams(location.search);
+      const safKeys=Object.keys(SAFETY), foodKeys=Object.keys(FOOD_TYPES);
+      if(p.get('reg'))  state.region=new Set(p.get('reg').split('.').map(i=>regions[+i]).filter(Boolean));
+      if(p.get('saf'))  state.safety=new Set(p.get('saf').split('.').map(i=>safKeys[+i]).filter(Boolean));
+      if(p.get('food')) state.food=new Set(p.get('food').split('.').map(i=>foodKeys[+i]).filter(Boolean));
+      if(p.get('guide')) state.guide=p.get('guide');
+      if(p.get('top100')==='1') state.top100=true;
+      if(p.get('recs')==='1')  state.all=true;
+      const t1=document.getElementById('togTop100'); if(t1) t1.classList.toggle('on',state.top100);
+      const t2=document.getElementById('togAll');   if(t2) t2.classList.toggle('on',state.all);
+      syncPills(); applyFilters(); renderList();
+      if(state.all) ensureRecs();
+      if(p.get('view')) setMode(p.get('view'));
+      const q=document.getElementById('q'), qv=p.get('q');
+      if(qv){ q.value=qv; q.dispatchEvent(new Event('input')); }
+    }catch(e){}
+  }
   function buildLegend(){
     let s='<b>Route safety</b>';
     for(const k in SAFETY) s+=`<div class="row"><span class="sw" style="background:${SAFECOL[k]}"></span>${SAFETY[k].label}</div>`;
@@ -610,6 +677,7 @@
     map.setLayoutProperty('hillshade','visibility',threeD?'visible':'none');
     if(threeD){ map.setTerrain({source:'dem',exaggeration:1.5}); map.easeTo({pitch:62,bearing:-17,duration:1200}); status('3D terrain — right-drag to tilt & rotate'); setTimeout(()=>status(''),3800); }
     else { map.setTerrain(null); map.easeTo({pitch:0,bearing:0,duration:800}); }
+    syncURL();
   }
   // ---------- road snapping (OSRM) ----------
   const ROAD_V='v2';
@@ -679,57 +747,7 @@
     map.getSource('recs').setData(fc(data));
   }
   // ================= Smart (on-device) natural-language search =================
-  const REGION_SYN={
-    'Marin / North Bay':['marin','north bay','sausalito','tiburon','fairfax','san anselmo','point reyes','nicasio','mill valley','tam','tamalpais','stinson','bolinas','tomales','napa','sonoma','wine country','healdsburg','petaluma','calistoga','st helena'],
-    'SF + Peninsula':['sf','san francisco','peninsula','woodside','portola valley','pescadero','half moon bay','skyline','la honda','pacifica','coastside','stanford','palo alto','menlo','san gregorio','montara','devil'],
-    'East Bay':['east bay','oakland','berkeley','diablo','orinda','moraga','livermore','sunol','danville','pleasanton','three bears','morgan territory','mines','castro valley','fremont'],
-    'South Bay':['south bay','san jose','morgan hill','gilroy','hamilton','sierra road','almaden','los gatos','saratoga','cupertino','milpitas'],
-    'Santa Cruz Mtns':['santa cruz','boulder creek','bonny doon','big basin','felton','ben lomond','summit','soquel','loma prieta','scotts valley','aptos','capitola']
-  };
-  const REGIONWORDS=new Set(Object.values(REGION_SYN).flat().flatMap(s=>s.split(' ')));
-  const FOOD_SYN={
-    restaurant:['restaurant','restaurants','dinner','lunch','eat','food','michelin','fine dining','taco','tacos','burrito','burritos','pizza','sushi','ramen','italian','mexican','thai','seafood','oyster','oysters','bbq','barbecue','chinese','indian','burger','burgers','dumpling','noodle'],
-    cafe:['cafe','cafes','coffee','espresso','latte','cappuccino'],
-    bakery:['bakery','bakeries','pastry','pastries','croissant','bread','sourdough','donut','doughnut','bagel','baked'],
-    brewery:['brewery','breweries','beer','beers','ipa','taproom','ale','pub','brew']
-  };
-  // Concept → keyword expansion. Lets abstract queries ("vegetarian", "get drunk", "jewish")
-  // match restaurant names, cuisines, descriptions, and the Chronicle's 160+ best-of guide titles.
-  const CONCEPTS=[
-    {re:/\b(vegetarian|vegan|veggie|plant ?based|meatless|no meat)\b/, kw:['vegetarian','vegan','veggie','plant-based','tofu','meatless'], label:'🌱 vegetarian / vegan'},
-    {re:/\b(get drunk|drunk|drink|drinks|drinking|booze|boozy|bar|bars|cocktail|cocktails|happy hour|nightcap|tipsy|wine|wines|beer|beers|brew|brews|natural wine|martini|martinis|speakeasy|dive|nightlife)\b/, kw:['bar','cocktail','wine','brewery','beer','ale','taproom','martini','natural wine','pub','sake','spirits','distillery','mezcal','dive'], food:'brewery', label:'🍸 drinks / bars'},
-    {re:/\b(jewish|kosher|deli|delis|bagel|bagels|pastrami|matzo|matzoh|challah|babka|knish|lox|reuben)\b/, kw:['jewish','deli','bagel','pastrami','matzo','challah','kosher','babka','knish','lox','smoked fish','reuben'], label:'✡ jewish / deli'},
-    {re:/\b(date|date night|romantic|anniversary|fancy|special occasion|splurge|impress|celebrate|celebration)\b/, kw:['fine dining','tasting menu','romantic','michelin','date','beautiful'], label:'💛 date night'},
-    {re:/\b(cheap|affordable|budget|value|inexpensive|deal|deals)\b/, kw:['affordable','cheap','value','bib gourmand'], label:'💸 cheap eats'},
-    {re:/\b(dessert|desserts|sweet|sweets|ice cream|treat|treats|cake|cakes|chocolate|churro|churros|donut|doughnut|pastry|pastries|cheesecake)\b/, kw:['dessert','ice cream','pastry','cake','chocolate','churro','doughnut','soft serve','cheesecake','sweet'], label:'🍰 sweets'},
-    {re:/\b(brunch|breakfast|pancake|pancakes|morning|omelette|omelet)\b/, kw:['brunch','breakfast','pancake','benedict','morning bun','omelette'], label:'🍳 brunch'},
-    {re:/\b(healthy|salad|salads|light|fresh|poke|grain bowl)\b/, kw:['salad','healthy','bowl','fresh','poke'], label:'🥗 healthy'},
-    {re:/\b(spicy|spice|szechuan|sichuan)\b/, kw:['spicy','chile','sichuan','szechuan','hot'], label:'🌶 spicy'},
-    {re:/\b(seafood|oyster|oysters|fish|crab|shrimp|ceviche|lobster)\b/, kw:['seafood','oyster','fish','crab','shrimp','ceviche','lobster'], label:'🦪 seafood'},
-    {re:/\b(gluten ?free|celiac)\b/, kw:['gluten-free','gluten free'], label:'🌾 gluten-free'}
-  ];
-  function parseQuery(raw){
-    const q=' '+raw.toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ')+' ';
-    const regions=new Set(), foods=new Set(), kw=new Set(); const conceptLabels=[];
-    for(const reg in REGION_SYN) if(REGION_SYN[reg].some(s=>q.includes(' '+s+' ')||q.includes(' '+s))) regions.add(reg);
-    for(const ft in FOOD_SYN) if(FOOD_SYN[ft].some(s=>q.includes(' '+s))) foods.add(ft);
-    CONCEPTS.forEach(c=>{ if(c.re.test(q)){ c.kw.forEach(k=>kw.add(k)); conceptLabels.push(c.label); if(c.food) foods.add(c.food); } });
-    let terrain=null;
-    if(/\b(flat|easy|mellow|casual|chill|beginner|gentle|relaxed)\b/.test(q)) terrain='flat';
-    if(/\brolling\b/.test(q)) terrain=terrain||'rolling';
-    if(/\b(hill|hills|hilly|climb|climbs|climbing|steep|hard|epic|mountain|mountains|tough|queen|wall)\b/.test(q)) terrain='hilly';
-    let distance=null;
-    if(/\b(short|quick|little|spin)\b/.test(q)) distance='short';
-    if(/\b(long|century|big|all day|all-day)\b/.test(q)) distance='long';
-    const michelin=/\bmichelin|bib\b/.test(q), chronicle=/\bchronicle|top 100\b/.test(q);
-    let dest=null;
-    if(/to (san francisco|sf)\b/.test(q)||/(into|toward|towards) (san francisco|sf)/.test(q)) dest='SF';
-    if(/to santa cruz|(into|toward|towards) santa cruz/.test(q)) dest='SantaCruz';
-    const stop=new Set(['the','and','way','ride','route','routes','with','near','for','some','want','find','get','best','good','nice','can','you','rides','bike','biking','cycling','that','have','has','from','food','place','places','spot','spots','where','out','how','let','lets','somewhere','eat','eats']);
-    // don't let region words double-count as keywords (region is scored separately)
-    raw.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).forEach(w=>{ if(w.length>2&&!stop.has(w)&&!REGIONWORDS.has(w)){ kw.add(w); if(w.length>4&&w.endsWith('s')) kw.add(w.slice(0,-1)); } });
-    return {raw,regions,foods,terrain,distance,michelin,chronicle,dest,kw:[...kw],conceptLabels};
-  }
+  const { REGION_SYN, REGIONWORDS, parseQuery } = window.ChudSearch;
   function kwHits(hay,P){ let n=0; for(const k of P.kw) if(k.length>2 && hay.indexOf(k)!==-1) n++; return n; }
   function scoreRoute(f,P){
     const p=f.properties, hay=(p.name+' '+p.why+' '+p.safetyNote+' '+p.region+' '+p.difficulty).toLowerCase();
@@ -1141,7 +1159,9 @@
     if(e.target.id==='tmSave'){ saveToken(); return; }
     if(e.target.id==='tmClear'){ clearToken(); return; }
     if(e.target.id==='shareBtn'){ shareList(); return; }
-    if(e.target.id==='navClose'){ document.getElementById('navSheet').hidden=true; if(navWatch!=null){navigator.geolocation.clearWatch(navWatch);navWatch=null;} if(navMarker){navMarker.remove();navMarker=null;} return; }
+    if(e.target.id==='openBucket'){ const bp=document.getElementById('bucketPage'); bp.hidden=false; renderBucket(); closeSheet(); return; }
+    if(e.target.id==='bpClose'){ document.getElementById('bucketPage').hidden=true; return; }
+    if(e.target.id==='navClose'){ stopLiveNav(); document.getElementById('navSheet').hidden=true; if(navWatch!=null){navigator.geolocation.clearWatch(navWatch);navWatch=null;} if(navMarker){navMarker.remove();navMarker=null;} navSteps=[]; navRouteName=null; return; }
     if(e.target.id==='navFollow'){ toggleFollow(e.target); return; }
     if(e.target.id==='navVoice'){ navVoice=!navVoice; e.target.classList.toggle('on',navVoice); return; }
     const gx=e.target.closest('[data-gpx]'); if(gx){ e.stopPropagation(); exportGPX(gx.getAttribute('data-gpx')); return; }

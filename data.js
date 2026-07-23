@@ -725,6 +725,78 @@ window.ROUTES = [
     safetyNote: "11,000 ft of climbing with long remote stretches and few services between Boulder Creek and the coast — carry food, tools and lights. Combines fast Hwy 9 descents, narrow ridge roads, and open Hwy 1 shoulder. Start at dawn.",
     url: "https://ridewithgps.com/routes/3341825",
     path: [[36.974,-122.03],[37.051,-122.073],[37.1263,-122.122],[37.2971,-122.132],[37.25,-122.2],[37.255,-122.383],[37.011,-122.196],[36.974,-122.03]]
+  },
+  {
+    name: "Mines Road to The Junction (Livermore)",
+    region: "East Bay",
+    miles: "58 (out & back)", elev: 3200, difficulty: "Hard", safety: "moderate",
+    why: "The Bay Area's great backcountry epic — a lonely, beautiful climb up Mines Rd through oak savanna to Rainbow Junction (The Junction) in San Antonio Valley, the classic burger-and-lemonade turnaround before Mt. Hamilton.",
+    safetyNote: "Very low traffic but remote, narrow and shoulderless with no services for ~25 mi — carry food, water, tools and lights. Occasional ranch trucks and blind curves; summer valley heat is serious.",
+    url: "https://ridewithgps.com/find/routes?search=mines%20road%20junction%20livermore",
+    path: [[37.6819,-121.7680],[37.6390,-121.7440],[37.5600,-121.6400],[37.4700,-121.5600],[37.4100,-121.5050],[37.3803,-121.4707]]
+  },
+  {
+    name: "Foothill Expressway & Portola Valley Loop",
+    region: "SF + Peninsula",
+    miles: "28", elev: 1100, difficulty: "Moderate", safety: "moderate",
+    why: "The quintessential Peninsula spin and gateway to the hills — smooth Foothill Expwy, Arastradero and the Portola Valley loop past Alpine Rd and Zott's, closing on Sand Hill and Junipero Serra.",
+    safetyNote: "Foothill Expwy has a wide marked bike lane but fast (45+ mph) traffic and busy expressway intersections; Portola and Alpine roads are calmer and cyclist-loved.",
+    url: "https://www.komoot.com/smarttour/e1387116164/foothill-expressway-and-junipero-serra-loop",
+    path: [[37.3930,-122.1140],[37.3830,-122.1300],[37.3930,-122.1570],[37.3840,-122.2110],[37.3950,-122.2350],[37.4180,-122.2130],[37.4160,-122.1700],[37.4000,-122.1300],[37.3930,-122.1140]]
+  },
+  {
+    name: "Old La Honda → Skyline → 84 Loop",
+    region: "SF + Peninsula",
+    miles: "22", elev: 2400, difficulty: "Hard", safety: "moderate",
+    why: "Home of the Peninsula's benchmark climb — Old La Honda's 3.4 mi / ~1,300 ft of shaded redwood switchbacks, then a ridge cruise on Skyline and a fast Hwy 84 descent back to Woodside.",
+    safetyNote: "Old La Honda is low-traffic and beloved; Skyline (Hwy 35) has moderate traffic with a shoulder; the Hwy 84 descent is fast with cars — control speed and take the lane through blind curves.",
+    url: "https://pjammcycling.com/climb/117.Old-La-Honda",
+    path: [[37.3770,-122.2230],[37.3610,-122.2830],[37.3350,-122.2900],[37.3170,-122.2710],[37.3860,-122.2600],[37.4040,-122.2570],[37.3830,-122.2350],[37.3770,-122.2230]]
+  },
+  {
+    name: "Calaveras Road (Sunol)",
+    region: "East Bay",
+    miles: "25", elev: 2000, difficulty: "Moderate–Hard", safety: "caution",
+    why: "A serpentine East Bay favorite — the sinuous ribbon of Calaveras Rd above the reservoir, all curves and rollers, finishing with a beer at Bosco's in Sunol.",
+    safetyNote: "Narrow with no shoulder, blind curves and periodic weekend car/motorcycle traffic — ride single-file and stay wide of the center line on descents.",
+    url: "https://ridewithgps.com/find/routes?search=calaveras%20road%20sunol",
+    path: [[37.5940,-121.8870],[37.5600,-121.8600],[37.5000,-121.8350],[37.4700,-121.8300],[37.4700,-121.8650]]
+  },
+  {
+    name: "Stevens Canyon / Mt. Eden Loop",
+    region: "South Bay",
+    miles: "22", elev: 1500, difficulty: "Moderate", safety: "moderate",
+    why: "A leafy South Bay classic from Cupertino — quiet Stevens Canyon Rd along the creek, the punchy Mt. Eden and Pierce climbs, and a Saratoga village finish.",
+    safetyNote: "Stevens Canyon and Mt. Eden are low-traffic; the Saratoga–Sunnyvale and Prospect stretches carry suburban traffic. A few narrow, shoulderless canyon segments.",
+    url: "https://ridewithgps.com/find/routes?search=stevens%20canyon%20mt%20eden%20loop",
+    path: [[37.3230,-122.0580],[37.3000,-122.0830],[37.2900,-122.1000],[37.2780,-122.0900],[37.2630,-122.0300],[37.3160,-122.0450],[37.3230,-122.0580]]
+  },
+  {
+    name: "Bay Trail — Mountain View Shoreline (car-free)",
+    region: "South Bay",
+    miles: "12", elev: 60, difficulty: "Easy", safety: "safer",
+    why: "A flat, family-friendly, almost entirely car-free spin on the Bay Trail and Stevens Creek Trail around Shoreline — salt marsh, egrets and Bay breezes with zero climbing.",
+    safetyNote: "Paved multi-use path, effectively car-free; watch for pedestrians, dogs and joggers, and strong afternoon headwinds along the open Bay.",
+    url: "https://ridewithgps.com/find/routes?search=bay%20trail%20shoreline%20mountain%20view",
+    path: [[37.4150,-122.0760],[37.4320,-122.0800],[37.4470,-122.0780],[37.4550,-122.1000],[37.4630,-122.1100]]
+  },
+  {
+    name: "Bay Trail — Point Isabel to the RSR Bridge (car-free)",
+    region: "East Bay",
+    miles: "14", elev: 90, difficulty: "Easy", safety: "safer",
+    why: "Ride the East Bay shoreline nearly car-free — Point Isabel, the Richmond Marina, and out onto the separated Richmond–San Rafael Bridge bike path with wide-open Bay and Marin views.",
+    safetyNote: "Mostly protected multi-use path and a fully separated bridge lane; a couple of on-street connectors in Richmond. The bridge path is very windy — grip the bars.",
+    url: "https://ridewithgps.com/find/routes?search=bay%20trail%20point%20isabel%20richmond%20bridge",
+    path: [[37.9000,-122.3200],[37.9120,-122.3530],[37.9300,-122.4000],[37.9360,-122.4450]]
+  },
+  {
+    name: "Bay Trail — Alameda / Bay Farm Loop (car-free)",
+    region: "East Bay",
+    miles: "12", elev: 40, difficulty: "Easy", safety: "safer",
+    why: "A mellow, flat, mostly car-free loop around Alameda's shoreline and over the bike bridge to Bay Farm Island — beaches, the SF skyline across the estuary, and easy cafe stops.",
+    safetyNote: "The shoreline path and Bay Farm bicycle bridge are car-free; a few calm neighborhood streets connect them. A great beginner and recovery ride.",
+    url: "https://ridewithgps.com/find/routes?search=bay%20trail%20alameda%20bay%20farm%20loop",
+    path: [[37.7650,-122.2400],[37.7550,-122.2550],[37.7400,-122.2500],[37.7300,-122.2400],[37.7600,-122.2300],[37.7650,-122.2400]]
   }
 ];
 
@@ -777,7 +849,8 @@ window.RESTAURANTS = [
   {name:"Bosco's Bones & Brew", town:"Sunol", region:"East Bay", lat:37.594, lng:-121.883, type:"brewery", rank:"Cyclist hub", stop:"Sit-down", desc:"The Sunol post-ride beer-and-burger spot for Calaveras/Palomares."},
   {name:"Sideboard", town:"Danville", region:"East Bay", lat:37.822, lng:-122.000, type:"cafe", rank:"Popular ride cafe", stop:"Quick", desc:"Coffee & breakfast base for the Mt. Diablo climbs."},
   {name:"Taco Bell Cantina (Pacifica)", town:"Pacifica", region:"SF + Peninsula", lat:37.5918, lng:-122.5028, type:"restaurant", rank:"Cult cyclist/surfer stop", stop:"Quick", desc:"The beachfront Taco Bell at Linda Mar — legendary walk-up-window post-ride/surf hangout right on Hwy 1."},
-  {name:"Alpine Inn (Zott's)", town:"Portola Valley", region:"SF + Peninsula", lat:37.4053, lng:-122.2098, type:"brewery", rank:"Historic cyclist beer garden", stop:"Sit-down", desc:"The legendary 'Zott's' — a centuries-old beer garden on Alpine Rd and the classic Peninsula ride meetup."}
+  {name:"Alpine Inn (Zott's)", town:"Portola Valley", region:"SF + Peninsula", lat:37.4053, lng:-122.2098, type:"brewery", rank:"Historic cyclist beer garden", stop:"Sit-down", desc:"The legendary 'Zott's' — a centuries-old beer garden on Alpine Rd and the classic Peninsula ride meetup."},
+  {name:"Rainbow Junction (The Junction)", town:"San Antonio Valley (Mines Rd)", region:"East Bay", lat:37.3803, lng:-121.4707, type:"restaurant", rank:"Legendary backcountry cyclist stop", stop:"Sit-down", desc:"The remote grass-fed burger, loaded BLT and house lemonade oasis at the Mines Rd / Del Puerto / San Antonio Valley junction — the classic turnaround on the Mines Road epic (open weekends)."}
 ];
 
 window.FOOD_TYPES = {
