@@ -1010,7 +1010,16 @@
   }
 
   // ---- FULL live turn-by-turn via Mapbox (cycling profile). Needs a free token, stored in-browser. ----
-  let liveWatch=null, liveSteps=[], liveSpoken=new Set(), liveOff=0, liveDest=null, liveTok=null, liveGeom=[];
+  let liveWatch=null, liveSteps=[], liveSpoken=new Set(), liveOff=0, liveDest=null, liveTok=null, liveGeom=[], lastLive=null;
+  // hide everything except the active route while navigating
+  const NAV_HIDE=['routes-line','routes-casing','route-starts','route-bikes','food','top100','top100-lbl','recs-cluster','recs-count','recs-pt'];
+  function setNavIsolation(on){
+    if(on){ NAV_HIDE.forEach(l=>{ if(map.getLayer(l)) map.setLayoutProperty(l,'visibility','none'); }); }
+    else { NAV_HIDE.forEach(l=>{ if(map.getLayer(l)) map.setLayoutProperty(l,'visibility','visible'); }); applyFilters(); applyRecsFilter(); }
+  }
+  function bearingDeg(lat1,lng1,lat2,lng2){ const toR=x=>x*Math.PI/180,toD=x=>x*180/Math.PI;
+    const y=Math.sin(toR(lng2-lng1))*Math.cos(toR(lat2)); const x=Math.cos(toR(lat1))*Math.sin(toR(lat2))-Math.sin(toR(lat1))*Math.cos(toR(lat2))*Math.cos(toR(lng2-lng1));
+    return (toD(Math.atan2(y,x))+360)%360; }
   function mbToken(){ try{ return (new URLSearchParams(location.search).get('token')) || localStorage.getItem('mapbox_token') || ''; }catch(e){ return ''; } }
   function promptToken(){
     const t=prompt('Live cycling navigation uses Mapbox. Paste a free Mapbox access token (get one at account.mapbox.com/access-tokens).\n\nIt is saved only in your browser — never uploaded. Tip: restrict the token to your site URL on Mapbox.');
@@ -1037,6 +1046,8 @@
     const route=await fetchMapbox(wps,liveTok);
     if(!route){ status('Couldn’t start live nav — check the Mapbox token.'); setTimeout(()=>status(''),3500); return; }
     applyLiveRoute(route); status('');
+    setNavIsolation(true);           // show only the route you're on
+    lastLive=null;
     document.getElementById('navBanner').hidden=false;
     document.getElementById('navLive').classList.add('on');
     if(!navigator.geolocation){ status('No GPS on this device'); return; }
@@ -1048,6 +1059,9 @@
     if(navMarker){ navMarker.remove(); navMarker=null; }
     document.getElementById('navBanner').hidden=true;
     const lb=document.getElementById('navLive'); if(lb) lb.classList.remove('on');
+    setNavIsolation(false);          // bring back all routes & food
+    lastLive=null;
+    map.easeTo({pitch: state.mode==='3d'?62:0, bearing:0, duration:700});   // reset the nav camera
   }
   function updateBanner(step, distMi){
     const bi=document.getElementById('nbIc'), bd=document.getElementById('nbDist'), bt=document.getElementById('nbTxt');
@@ -1060,7 +1074,11 @@
     const lng=pos.coords.longitude, lat=pos.coords.latitude;
     if(!navMarker){ const el=document.createElement('div'); el.style.cssText='width:18px;height:18px;border-radius:50%;background:#38e1c6;border:3px solid #fff;box-shadow:0 0 12px rgba(56,225,198,.9)'; navMarker=new maplibregl.Marker({element:el}); }
     navMarker.setLngLat([lng,lat]).addTo(map);
-    map.easeTo({center:[lng,lat],zoom:Math.max(map.getZoom(),15),duration:600});
+    // follow-behind camera that turns with your direction of travel
+    let hd=(pos.coords.heading!=null && !isNaN(pos.coords.heading))?pos.coords.heading:null;
+    if(hd==null && lastLive && haversineMi(lastLive[0],lastLive[1],lng,lat)>0.003) hd=bearingDeg(lastLive[1],lastLive[0],lat,lng);
+    lastLive=[lng,lat];
+    map.easeTo({center:[lng,lat], zoom:Math.max(map.getZoom(),16), bearing:(hd!=null?hd:map.getBearing()), pitch:60, duration:800});
     // upcoming maneuver = nearest step maneuver
     let bi=0,bd=Infinity; liveSteps.forEach((s,i)=>{ const loc=s.maneuver.location; const d=haversineMi(lng,lat,loc[0],loc[1]); if(d<bd){bd=d;bi=i;} });
     setActiveCue(bi); updateBanner(liveSteps[bi], bd);
