@@ -206,7 +206,9 @@
   .tm-p{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 10px}
   .tm-in{width:100%;margin:10px 0;background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:9px;padding:10px;color:var(--ink);font-size:13px}
   .tm-in:focus{outline:none;border-color:var(--accent)}
-  .tm-actions{display:flex;gap:8px}
+  .tm-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .tm-hint{font-size:10.5px;color:var(--muted);margin-top:9px}
+  .tm-hd #tmClose{cursor:pointer;padding:2px 8px;font-size:18px}
   .panel-toggle{display:none}
   .sheet-handle{display:none}
   @media (max-width:820px){
@@ -328,7 +330,8 @@
     <p class="tm-p">Navigation works <b>keyless</b> out of the box. For cycling-grade turns &amp; smoother rerouting, add a free Mapbox token (optional — it's stored only in this browser).</p>
     <a class="minibtn" id="tmGet" href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener">Get a free token ↗</a>
     <input id="tokenInput" class="tm-in" placeholder="pk.eyJ… paste token here" autocomplete="off" spellcheck="false"/>
-    <div class="tm-actions"><button id="tmSave" class="minibtn on">Save token</button><button id="tmClear" class="minibtn">Remove</button></div>
+    <div class="tm-actions"><button id="tmSave" class="minibtn on">Save token</button><button id="tmSkip" class="minibtn">Skip — use keyless</button><button id="tmClear" class="minibtn">Remove</button></div>
+    <div class="tm-hint">You don't need a token — tap Skip and just use ▶ Live nav.</div>
   </div>
 </div>
 
@@ -1152,7 +1155,7 @@
     if(e.target.id==='navStop'){ stopLiveNav(); return; }
     if(e.target.id==='recenterBtn'){ followMode=true; showRecenter(false); if(lastLive) map.easeTo({center:lastLive,zoom:16,pitch:60,duration:600}); return; }
     if(e.target.id==='navToken'){ openTokenModal(); return; }
-    if(e.target.id==='tmClose'){ document.getElementById('tokenModal').hidden=true; return; }
+    if(e.target.id==='tmClose'||e.target.id==='tmSkip'||e.target.id==='tokenModal'){ document.getElementById('tokenModal').hidden=true; return; }
     if(e.target.id==='tmSave'){ saveToken(); return; }
     if(e.target.id==='tmClear'){ clearToken(); return; }
     if(e.target.id==='shareBtn'){ shareList(); return; }
