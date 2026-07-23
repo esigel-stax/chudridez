@@ -140,10 +140,29 @@
   /* warm up map controls */
   .maplibregl-ctrl-scale{background:rgba(33,20,13,.7)!important;color:#f6ecd9!important;border-color:var(--line)!important;border-radius:4px}
   .panel-toggle{display:none}
+  .sheet-handle{display:none}
   @media (max-width:720px){
-    .panel{width:calc(100vw - 32px)}
+    /* compact title */
+    .titlecard{top:10px;left:10px;right:auto;max-width:64vw;padding:9px 12px}
+    .titlecard .tag,.titlecard .stats{display:none}
+    .titlecard h1{font-size:17px}
+    .titlecard .kicker{font-size:8.5px;letter-spacing:1.6px}
+    .logo svg{width:28px;height:36px}
+    .legend{display:none}
+    /* panel becomes a bottom sheet */
+    .panel{top:auto;bottom:0;left:0;right:0;width:100%;max-width:100%;max-height:82vh;border-radius:20px 20px 0 0;
+      transform:translateY(calc(100% - 56px));transition:transform .3s cubic-bezier(.4,0,.2,1)}
+    .panel.open{transform:translateY(0)}
+    .sheet-handle{position:relative;display:flex;align-items:center;justify-content:center;gap:7px;height:56px;flex:none;cursor:pointer;
+      font:600 13px 'Fraunces',serif;color:var(--accent);border-bottom:1px solid var(--line);-webkit-tap-highlight-color:transparent}
+    .sheet-handle::before{content:'';position:absolute;top:8px;left:50%;transform:translateX(-50%);width:44px;height:4px;border-radius:2px;background:rgba(232,176,75,.55)}
+    .panel .scroller{flex:1 1 auto;min-height:0;padding-top:10px}
     .list{max-height:30vh}
-    .titlecard{max-width:calc(100vw - 32px)}
+    /* keep map controls above the collapsed sheet */
+    .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left{bottom:62px!important}
+    /* bigger tap targets */
+    .pill{padding:7px 12px;font-size:12.5px}
+    .searchbox input{font-size:16px}   /* 16px avoids iOS zoom-on-focus */
   }
 </style>
 </head>
@@ -172,7 +191,8 @@
   <div class="stats"><span><b>79</b> routes</span><span><b>42</b> stops</span><span><b>1,274</b> Chronicle recs</span><span><b>5</b> regions</span></div>
 </div>
 
-<div class="panel">
+<div class="panel" id="panel">
+  <div class="sheet-handle" id="sheetHandle">🔎 Search &amp; filters</div>
   <div class="scroller">
     <div class="grp search">
       <div class="lbl">Smart search <span class="ai">AI</span></div>
@@ -245,6 +265,9 @@
 
   function milesNum(s){ const n=String(s).match(/\d+/g); if(!n) return 0; const a=n.map(Number); return (a.length>=2 && /\d+\s*[-–]\s*\d+/.test(String(s)))?(a[0]+a[1])/2:a[0]; }
   function status(msg){ const el=document.getElementById('status'); if(!msg){el.classList.remove('show');return;} el.textContent=msg; el.classList.add('show'); }
+  const isMobile=()=>window.matchMedia('(max-width:720px)').matches;
+  function openSheet(){ if(isMobile()){ const p=document.getElementById('panel'); if(p) p.classList.add('open'); } }
+  function closeSheet(){ if(isMobile()){ const p=document.getElementById('panel'); if(p) p.classList.remove('open'); } }
 
   // ---------- base style ----------
   const style={
@@ -414,9 +437,10 @@
 
   // ---------- route list ----------
   function routeBounds(i){ const b=new maplibregl.LngLatBounds(); routeFeatures[i].geometry.coordinates.forEach(c=>b.extend(c)); return b; }
+  function fitPad(){ return isMobile()?{top:60,left:28,right:28,bottom:80}:{top:60,left:60,right:350,bottom:60}; }
   function fitAll(){ const b=new maplibregl.LngLatBounds(); let any=false;
     routeFeatures.forEach(f=>{ if(state.region.has(f.properties.region)&&state.safety.has(f.properties.safety)){f.geometry.coordinates.forEach(c=>b.extend(c));any=true;} });
-    if(any) map.fitBounds(b,{padding:{top:60,left:60,right:350,bottom:60},duration:800}); }
+    if(any) map.fitBounds(b,{padding:fitPad(),duration:800}); }
   function renderList(){
     const list=document.getElementById('list');
     let shown=routeFeatures.filter(f=>state.region.has(f.properties.region)&&state.safety.has(f.properties.safety));
@@ -433,7 +457,8 @@
         <p>${p.why}</p></div>`;
     }).join('') || '<div class="count">No routes match the filters.</div>';
     list.querySelectorAll('.card').forEach(c=>c.addEventListener('click',()=>{
-      const i=+c.dataset.i; map.fitBounds(routeBounds(i),{padding:{top:80,left:80,right:360,bottom:80},duration:900});
+      const i=+c.dataset.i; closeSheet(); const pad=isMobile()?{top:70,left:40,right:40,bottom:90}:{top:80,left:80,right:360,bottom:80};
+      map.fitBounds(routeBounds(i),{padding:pad,duration:900});
       const p=routeFeatures[i].properties; const mid=routeFeatures[i].geometry.coordinates[Math.floor(routeFeatures[i].geometry.coordinates.length/2)];
       routePopup(p,mid);
     }));
@@ -464,6 +489,8 @@
     document.getElementById('btnMap').addEventListener('click',()=>setMode('map'));
     document.getElementById('btnSat').addEventListener('click',()=>setMode('sat'));
     document.getElementById('btn3d').addEventListener('click',()=>setMode('3d'));
+    const sh=document.getElementById('sheetHandle');
+    if(sh) sh.addEventListener('click',()=>{ const p=document.getElementById('panel'); p.classList.toggle('open'); });
     wireSearch();
   }
   function syncPills(){
@@ -699,7 +726,9 @@
     if(!rr.length && !food.length) html='<div class="res-hdr" style="opacity:.75">No matches — try simpler terms like “bakery marin” or “climb east bay”.'+(!recsLoaded?' (Turn on “All Chronicle recs” to search all 1,274 spots.)':'')+'</div>';
     const R=document.getElementById('results'); R.innerHTML=html;
     R.querySelectorAll('.res').forEach(el=>el.addEventListener('click',()=>{
-      if(el.dataset.kind==='route'){ const i=+el.dataset.i; map.fitBounds(routeBounds(i),{padding:{top:80,left:80,right:360,bottom:80},duration:900});
+      closeSheet();
+      if(el.dataset.kind==='route'){ const i=+el.dataset.i; const pad=isMobile()?{top:70,left:40,right:40,bottom:90}:{top:80,left:80,right:360,bottom:80};
+        map.fitBounds(routeBounds(i),{padding:pad,duration:900});
         const g=routeFeatures[i].geometry.coordinates; routePopup(routeFeatures[i].properties, g[Math.floor(g.length/2)]); }
       else { const x=lastFood[+el.dataset.idx]; map.flyTo({center:x.c,zoom:13.5,duration:900});
         popup(x.c, x.kind==='food'?foodHTML(x.p):(x.kind==='top'?topHTML(x.p):recHTML(x.p))); }
@@ -709,7 +738,7 @@
     if(P.regions.size){ state.region=new Set(P.regions); }
     if(P.foods.size){ state.food=new Set(P.foods); }
     syncPills(); applyFilters(); renderList();
-    if(rr.length){ const b=new maplibregl.LngLatBounds(); rr.slice(0,4).forEach(x=>x.f.geometry.coordinates.forEach(c=>b.extend(c))); map.fitBounds(b,{padding:{top:70,left:70,right:360,bottom:70},duration:900}); }
+    if(rr.length){ const b=new maplibregl.LngLatBounds(); rr.slice(0,4).forEach(x=>x.f.geometry.coordinates.forEach(c=>b.extend(c))); map.fitBounds(b,{padding:fitPad(),duration:900}); }
     else if(P.regions.size){ fitAll(); }
   }
   function resetSearch(){
