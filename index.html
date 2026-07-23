@@ -193,6 +193,17 @@
   .navbanner .nb-txt{font:600 14px 'Fraunces',serif;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .navbanner #navStop{background:rgba(0,0,0,.25);border:none;color:#fff;border-radius:8px;width:28px;height:28px;cursor:pointer;flex:none}
   @media (max-width:820px){ .navbanner{top:auto;bottom:calc(56px + 12px)} }
+  .recenterbtn{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:31;font:600 12.5px Inter;padding:9px 15px;border-radius:999px;
+    background:linear-gradient(120deg,var(--accent),#2aa6cf);color:#04262a;border:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+  @media (max-width:820px){ .recenterbtn{bottom:calc(56px + 14px)} }
+  .tokenmodal{position:absolute;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(6,10,14,.55);backdrop-filter:blur(3px)}
+  .tm-card{width:min(400px,92vw);background:var(--glass2);border:1px solid var(--line);border-radius:16px;padding:16px 18px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+  .tm-hd{display:flex;align-items:center;justify-content:space-between;font:600 15px 'Fraunces',serif;margin-bottom:8px}
+  .tm-hd #tmClose{cursor:pointer;color:var(--muted)}
+  .tm-p{font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 10px}
+  .tm-in{width:100%;margin:10px 0;background:rgba(255,255,255,.07);border:1px solid var(--line);border-radius:9px;padding:10px;color:var(--ink);font-size:13px}
+  .tm-in:focus{outline:none;border-color:var(--accent)}
+  .tm-actions{display:flex;gap:8px}
   .panel-toggle{display:none}
   .sheet-handle{display:none}
   @media (max-width:820px){
@@ -307,6 +318,16 @@
 <div class="stoppicker" id="stopPicker" hidden></div>
 <div class="navsheet" id="navSheet" hidden></div>
 <div class="navbanner" id="navBanner" hidden><div class="nb-ic" id="nbIc">↑</div><div class="nb-main"><div class="nb-dist" id="nbDist"></div><div class="nb-txt" id="nbTxt"></div></div><button id="navStop" title="Stop navigation">✕</button></div>
+<button class="recenterbtn" id="recenterBtn" hidden>◎ Re-center</button>
+<div class="tokenmodal" id="tokenModal" hidden>
+  <div class="tm-card">
+    <div class="tm-hd">Live navigation <span id="tmClose">✕</span></div>
+    <p class="tm-p">Navigation works <b>keyless</b> out of the box. For cycling-grade turns &amp; smoother rerouting, add a free Mapbox token (optional — it's stored only in this browser).</p>
+    <a class="minibtn" id="tmGet" href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener">Get a free token ↗</a>
+    <input id="tokenInput" class="tm-in" placeholder="pk.eyJ… paste token here" autocomplete="off" spellcheck="false"/>
+    <div class="tm-actions"><button id="tmSave" class="minibtn on">Save token</button><button id="tmClear" class="minibtn">Remove</button></div>
+  </div>
+</div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="data.js"></script>
@@ -446,7 +467,8 @@
       `<div class="sn">${p.why}</div><div class="sn"><b>Safety:</b> ${p.safetyNote}</div>`+
       `<a href="${p.url}" target="_blank" rel="noopener">View route / GPX →</a><br>`+
       `<button class="pinbtn" data-pin="${attr(p.name)}">${isPinned(p.name)?'✅ In your bucket':'🔖 Pin to bucket'}</button> `+
-      `<button class="pinbtn" data-nav="${attr(p.name)}">🧭 Directions</button>`);
+      `<button class="pinbtn" data-nav="${attr(p.name)}">🧭 Directions</button> `+
+      `<button class="pinbtn" data-gpx="${attr(p.name)}">⤓ GPX</button>`);
   }
   function foodHTML(p){ const t=FOOD_TYPES[p.type];
     return `<h3>${t.emoji} ${p.name}</h3><span class="badge" style="background:${t.color};color:#fff">${p.rank}</span>`+
@@ -867,7 +889,7 @@
         <div class="bkt-top"><div class="bkt-name">${n}</div><button class="bkt-x" data-bucket="remove" data-r="${attr(n)}" title="Remove">✕</button></div>
         <div class="bkt-meta">${rt.region} · <b style="color:#ffe9c7">${miles}</b>${b.miles!=null?' with stops':''}${b.climb!=null?(' · ≈'+b.climb.toLocaleString()+' ft climb'):''} · ${rt.difficulty}</div>
         ${stops.length?('<div>'+stops.map((s,i)=>`<span class="bkt-stop">🍽️ ${s.name}<b data-bucket="delstop" data-r="${attr(n)}" data-i="${i}" title="remove stop">✕</b></span>`).join('')+'</div>'):''}
-        <div class="bkt-actions"><button data-bucket="view" data-r="${attr(n)}">View</button><button data-bucket="addstop" data-r="${attr(n)}">＋ Stop</button><button data-bucket="nav" data-r="${attr(n)}">🧭 Directions</button></div>
+        <div class="bkt-actions"><button data-bucket="view" data-r="${attr(n)}">View</button><button data-bucket="addstop" data-r="${attr(n)}">＋ Stop</button><button data-bucket="nav" data-r="${attr(n)}">🧭 Go</button><button data-bucket="gpx" data-r="${attr(n)}">⤓ GPX</button></div>
       </div>`;
     }).join('');
   }
@@ -963,6 +985,29 @@
     }catch(e){}
   }
 
+  // ---- GPX export (uses the road-snapped / custom geometry when available) ----
+  function coordsForExport(name){
+    const b=bucket[name];
+    if(b&&b.geom&&b.geom.length) return {coords:b.geom, stops:b.stops||[]};
+    const rf=routeFeatures.find(f=>f.properties.name===name);
+    const rt=ROUTES.find(x=>x.name===name);
+    return {coords: rf?rf.geometry.coordinates:rt.path.map(p=>[p[1],p[0]]), stops:(b&&b.stops)||[]};
+  }
+  function exportGPX(name){
+    const {coords,stops}=coordsForExport(name); if(!coords||!coords.length){ return; }
+    const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    let g='<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Chudridez" xmlns="http://www.topografix.com/GPX/1/1">\n';
+    g+='<metadata><name>'+esc(name)+'</name></metadata>\n';
+    stops.forEach(s=>{ g+='<wpt lat="'+(+s.lat).toFixed(6)+'" lon="'+(+s.lng).toFixed(6)+'"><name>'+esc(s.name)+'</name><sym>Restaurant</sym></wpt>\n'; });
+    g+='<trk><name>'+esc(name)+'</name><trkseg>\n';
+    coords.forEach(c=>{ g+='<trkpt lat="'+(+c[1]).toFixed(6)+'" lon="'+(+c[0]).toFixed(6)+'"></trkpt>\n'; });
+    g+='</trkseg></trk>\n</gpx>\n';
+    const url=URL.createObjectURL(new Blob([g],{type:'application/gpx+xml'}));
+    const a=document.createElement('a'); a.href=url; a.download=name.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()+'.gpx';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500);
+    status('GPX downloaded ✓'); setTimeout(()=>status(''),2200);
+  }
+
   // ---- turn-by-turn cue sheet (OSRM steps) + live follow + voice ----
   let navWatch=null, navSteps=[], navActive=-1, navVoice=false, navMarker=null, navRouteName=null;
   function waypointsFor(name){ const rt=ROUTES.find(x=>x.name===name); const path=rt.path.map(p=>[p[1],p[0]]);
@@ -988,7 +1033,7 @@
       navSteps=[]; legs.forEach(l=>l.steps.forEach(s=>navSteps.push(s)));
       const total=(j.routes[0].distance/1609.34).toFixed(1);
       box.innerHTML='<div class="nav-hd">🧭 '+title+'<span id="navClose">✕</span></div>'+
-        '<div class="nav-sub">'+total+' mi · '+navSteps.length+' cues <button id="navLive" class="minibtn">▶ Live nav</button> <button id="navFollow" class="minibtn">◉ Follow GPS</button> <button id="navVoice" class="minibtn">🔊 Voice</button></div>'+
+        '<div class="nav-sub">'+total+' mi · '+navSteps.length+' cues <button id="navLive" class="minibtn">▶ Live nav</button> <button id="navFollow" class="minibtn">◉ Follow GPS</button> <button id="navVoice" class="minibtn">🔊 Voice</button> <button id="navToken" class="minibtn">⚙</button></div>'+
         '<div class="cues">'+navSteps.map((s,i)=>`<div class="cue" data-cue="${i}"><div class="cue-ic">${cueIcon(s.maneuver)}</div><div><div class="cue-t">${cueText(s.maneuver,s.name)}</div><div class="cue-d">${fmtDist(s.distance)}</div></div></div>`).join('')+'</div>';
     }catch(e){ box.innerHTML='<div class="nav-hd">🧭 '+title+'<span id="navClose">✕</span></div><div class="nav-sub">Directions unavailable right now — try again in a moment.</div>'; }
   }
@@ -1010,7 +1055,14 @@
   }
 
   // ---- FULL live turn-by-turn via Mapbox (cycling profile). Needs a free token, stored in-browser. ----
-  let liveWatch=null, liveSteps=[], liveSpoken=new Set(), liveOff=0, liveDest=null, liveTok=null, liveGeom=[], lastLive=null;
+  let liveWatch=null, liveSteps=[], liveSpoken=new Set(), liveOff=0, liveDest=null, liveTok=null, liveGeom=[], lastLive=null, followMode=true;
+  function showRecenter(on){ const b=document.getElementById('recenterBtn'); if(b) b.hidden=!on; }
+  // manual pan/zoom/rotate during nav pauses auto-follow (so you can zoom out); a Re-center button resumes it
+  ['dragstart','zoomstart','rotatestart','pitchstart'].forEach(ev=>map.on(ev,e=>{ if(liveWatch!=null && e && e.originalEvent){ followMode=false; showRecenter(true); } }));
+  async function fetchOSRM(coords){
+    try{ const j=await fetch('https://router.project-osrm.org/route/v1/driving/'+coords.map(c=>c[0]+','+c[1]).join(';')+'?overview=full&geometries=geojson&steps=true').then(r=>r.ok?r.json():null); if(j&&j.routes&&j.routes[0]) return j.routes[0]; }catch(e){} return null;
+  }
+  async function fetchRoute(coords){ const tok=mbToken(); if(tok){ const r=await fetchMapbox(coords,tok); if(r) return r; } return await fetchOSRM(coords); }
   // hide everything except the active route while navigating
   const NAV_HIDE=['routes-line','routes-casing','route-starts','route-bikes','food','top100','top100-lbl','recs-cluster','recs-count','recs-pt'];
   function setNavIsolation(on){
@@ -1021,10 +1073,9 @@
     const y=Math.sin(toR(lng2-lng1))*Math.cos(toR(lat2)); const x=Math.cos(toR(lat1))*Math.sin(toR(lat2))-Math.sin(toR(lat1))*Math.cos(toR(lat2))*Math.cos(toR(lng2-lng1));
     return (toD(Math.atan2(y,x))+360)%360; }
   function mbToken(){ try{ return (new URLSearchParams(location.search).get('token')) || localStorage.getItem('mapbox_token') || ''; }catch(e){ return ''; } }
-  function promptToken(){
-    const t=prompt('Live cycling navigation uses Mapbox. Paste a free Mapbox access token (get one at account.mapbox.com/access-tokens).\n\nIt is saved only in your browser — never uploaded. Tip: restrict the token to your site URL on Mapbox.');
-    if(t && t.trim()){ try{ localStorage.setItem('mapbox_token', t.trim()); }catch(e){} return t.trim(); } return '';
-  }
+  function openTokenModal(){ const m=document.getElementById('tokenModal'); document.getElementById('tokenInput').value=mbToken()||''; m.hidden=false; }
+  function saveToken(){ const v=document.getElementById('tokenInput').value.trim(); try{ if(v) localStorage.setItem('mapbox_token',v); }catch(e){} document.getElementById('tokenModal').hidden=true; status(v?'Mapbox token saved ✓ — Live nav will use it':'No token entered'); setTimeout(()=>status(''),2600); }
+  function clearToken(){ try{ localStorage.removeItem('mapbox_token'); }catch(e){} const i=document.getElementById('tokenInput'); if(i) i.value=''; status('Token removed — using keyless routing'); setTimeout(()=>status(''),2600); }
   function minDistCoords(coords,lng,lat){ let m=Infinity; for(const c of coords){ const d=haversineMi(lng,lat,c[0],c[1]); if(d<m)m=d; } return m; }
   async function fetchMapbox(coords,tok){
     const path=coords.map(c=>c[0]+','+c[1]).join(';');
@@ -1040,14 +1091,13 @@
   }
   async function startLiveNav(){
     if(!navRouteName) return;
-    liveTok=mbToken(); if(!liveTok){ liveTok=promptToken(); if(!liveTok) return; }
     const wps=waypointsFor(navRouteName); liveDest=wps[wps.length-1];
-    status('Starting live navigation…');
-    const route=await fetchMapbox(wps,liveTok);
-    if(!route){ status('Couldn’t start live nav — check the Mapbox token.'); setTimeout(()=>status(''),3500); return; }
+    status(mbToken()?'Starting live navigation (Mapbox)…':'Starting live navigation…');
+    const route=await fetchRoute(wps);
+    if(!route){ status('Couldn’t start navigation — routing offline.'); setTimeout(()=>status(''),3000); return; }
     applyLiveRoute(route); status('');
     setNavIsolation(true);           // show only the route you're on
-    lastLive=null;
+    followMode=true; showRecenter(false); lastLive=null;
     document.getElementById('navBanner').hidden=false;
     document.getElementById('navLive').classList.add('on');
     if(!navigator.geolocation){ status('No GPS on this device'); return; }
@@ -1060,7 +1110,7 @@
     document.getElementById('navBanner').hidden=true;
     const lb=document.getElementById('navLive'); if(lb) lb.classList.remove('on');
     setNavIsolation(false);          // bring back all routes & food
-    lastLive=null;
+    showRecenter(false); followMode=true; lastLive=null;
     map.easeTo({pitch: state.mode==='3d'?62:0, bearing:0, duration:700});   // reset the nav camera
   }
   function updateBanner(step, distMi){
@@ -1074,20 +1124,21 @@
     const lng=pos.coords.longitude, lat=pos.coords.latitude;
     if(!navMarker){ const el=document.createElement('div'); el.style.cssText='width:18px;height:18px;border-radius:50%;background:#38e1c6;border:3px solid #fff;box-shadow:0 0 12px rgba(56,225,198,.9)'; navMarker=new maplibregl.Marker({element:el}); }
     navMarker.setLngLat([lng,lat]).addTo(map);
-    // follow-behind camera that turns with your direction of travel
+    // follow-behind camera that turns with your direction of travel (only while following)
     let hd=(pos.coords.heading!=null && !isNaN(pos.coords.heading))?pos.coords.heading:null;
     if(hd==null && lastLive && haversineMi(lastLive[0],lastLive[1],lng,lat)>0.003) hd=bearingDeg(lastLive[1],lastLive[0],lat,lng);
     lastLive=[lng,lat];
-    map.easeTo({center:[lng,lat], zoom:Math.max(map.getZoom(),16), bearing:(hd!=null?hd:map.getBearing()), pitch:60, duration:800});
+    if(followMode) map.easeTo({center:[lng,lat], zoom:Math.max(map.getZoom(),16), bearing:(hd!=null?hd:map.getBearing()), pitch:60, duration:800});
     // upcoming maneuver = nearest step maneuver
     let bi=0,bd=Infinity; liveSteps.forEach((s,i)=>{ const loc=s.maneuver.location; const d=haversineMi(lng,lat,loc[0],loc[1]); if(d<bd){bd=d;bi=i;} });
     setActiveCue(bi); updateBanner(liveSteps[bi], bd);
     const cur=liveSteps[bi];
     if(cur&&cur.voiceInstructions){ const remain=bd*1609.34; cur.voiceInstructions.forEach(vi=>{ const key=bi+':'+vi.distanceAlongGeometry; if(remain<=vi.distanceAlongGeometry && !liveSpoken.has(key)){ liveSpoken.add(key); speak(vi.announcement); } }); }
+    else if(cur){ const key='s'+bi; if(bd<0.08 && !liveSpoken.has(key)){ liveSpoken.add(key); speak(cueText(cur.maneuver,cur.name)); } } // keyless voice
     // off-route → reroute from here to destination
     if(liveGeom.length){
       const off = minDistCoords(liveGeom,lng,lat);
-      if(off>0.05){ if(++liveOff>=3){ liveOff=0; speak('Rerouting'); status('Rerouting…'); const r=await fetchMapbox([[lng,lat],liveDest],liveTok); if(r){ applyLiveRoute(r); status(''); } } }
+      if(off>0.05){ if(++liveOff>=3){ liveOff=0; speak('Rerouting'); status('Rerouting…'); const r=await fetchRoute([[lng,lat],liveDest]); if(r){ applyLiveRoute(r); status(''); } } }
       else liveOff=0;
     }
   }
@@ -1096,10 +1147,16 @@
   document.addEventListener('click', e=>{
     if(e.target.id==='navLive'){ startLiveNav(); return; }
     if(e.target.id==='navStop'){ stopLiveNav(); return; }
+    if(e.target.id==='recenterBtn'){ followMode=true; showRecenter(false); if(lastLive) map.easeTo({center:lastLive,zoom:16,pitch:60,duration:600}); return; }
+    if(e.target.id==='navToken'){ openTokenModal(); return; }
+    if(e.target.id==='tmClose'){ document.getElementById('tokenModal').hidden=true; return; }
+    if(e.target.id==='tmSave'){ saveToken(); return; }
+    if(e.target.id==='tmClear'){ clearToken(); return; }
     if(e.target.id==='shareBtn'){ shareList(); return; }
     if(e.target.id==='navClose'){ document.getElementById('navSheet').hidden=true; if(navWatch!=null){navigator.geolocation.clearWatch(navWatch);navWatch=null;} if(navMarker){navMarker.remove();navMarker=null;} return; }
     if(e.target.id==='navFollow'){ toggleFollow(e.target); return; }
     if(e.target.id==='navVoice'){ navVoice=!navVoice; e.target.classList.toggle('on',navVoice); return; }
+    const gx=e.target.closest('[data-gpx]'); if(gx){ e.stopPropagation(); exportGPX(gx.getAttribute('data-gpx')); return; }
     const nv=e.target.closest('[data-nav]'); if(nv){ e.stopPropagation(); openNav(waypointsFor(nv.getAttribute('data-nav')), nv.getAttribute('data-nav')); return; }
     const cue=e.target.closest('[data-cue]'); if(cue){ const s=navSteps[+cue.dataset.cue]; if(s&&s.maneuver&&s.maneuver.location) map.flyTo({center:s.maneuver.location,zoom:15}); return; }
     const pin=e.target.closest('[data-pin]');
@@ -1113,6 +1170,7 @@
       else if(act==='view'){ viewBucketRoute(r); closeSheet(); }
       else if(act==='addstop'){ openStopPicker(r); }
       else if(act==='nav'){ openNav(waypointsFor(r), r); closeSheet(); }
+      else if(act==='gpx'){ exportGPX(r); }
       else if(act==='delstop'){ const i=+b.getAttribute('data-i'); (bucket[r].stops||[]).splice(i,1); recomputeRoute(r); }
     }
   });
