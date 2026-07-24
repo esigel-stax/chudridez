@@ -22,6 +22,7 @@
   :root{
     /* find .status{...z-index:6;...} and bump it above the bucket page overlay */
     .status{ z-index:70; ... }   /* was z-index:6 */
+    [hidden]{display:none !important;}   /* global: any element with hidden attr is truly hidden */
     .bucketpage[hidden]{ display:none !important; }
     --ink:#f6ecd9; --muted:#cbae87; --line:rgba(232,176,75,.30);
     --glass:rgba(33,20,13,.82); --glass2:rgba(47,29,19,.88);
@@ -1251,9 +1252,9 @@
     const b=e.target.closest('[data-bucket]');
     if(b){ e.stopPropagation(); const act=b.getAttribute('data-bucket'), r=b.getAttribute('data-r');
       if(act==='remove'){ delete bucket[r]; if(customView===r) clearCustom(); saveBucket(); renderBucket(); renderList(); }
-      else if(act==='view'){ viewBucketRoute(r); closeSheet(); }
-      else if(act==='addstop'){ openStopPicker(r); }
-      else if(act==='nav'){ openNav(waypointsFor(r), r); closeSheet(); }
+      else if(act==='view'){ document.getElementById('bucketPage').hidden=true; viewBucketRoute(r); closeSheet(); }
+      else if(act==='addstop'){ document.getElementById('bucketPage').hidden=true; openStopPicker(r); }
+      else if(act==='nav'){ document.getElementById('bucketPage').hidden=true; openNav(waypointsFor(r), r); closeSheet(); }
       else if(act==='gpx'){ exportGPX(r); }
       else if(act==='delstop'){ const i=+b.getAttribute('data-i'); (bucket[r].stops||[]).splice(i,1); recomputeRoute(r); }
     }
