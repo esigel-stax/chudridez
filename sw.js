@@ -1,14 +1,14 @@
-/* Chudridez service worker — v4
+/* Chudridez service worker — v6
    IMPORTANT CHANGE: the app shell (index.html, data.js, CSS/JS) is now NETWORK-FIRST,
    so when you're online you always get the latest deploy and never get trapped on a
    stale cached page. Map tiles stay cache-first (fast + offline). Bump CACHE_VERSION
    on any future deploy to force old caches to clear. */
-const CACHE_VERSION = 'chudridez-v4';
+const CACHE_VERSION = 'chudridez-v6';
 const SHELL  = `${CACHE_VERSION}-shell`;
 const RUNTIME = `${CACHE_VERSION}-runtime`;
 
 const SHELL_URLS = [
-  './', './index.html', './data.js', './manifest.json',
+  './', './index.html', './data.js', './routing-core.js?v=6', './basemap-style.js?v=6', './manifest.json',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'
 ];
@@ -41,10 +41,13 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
+  // Credentials and API responses must never enter service-worker caches.
+  if (['token','access_token','api_key'].some(k => url.searchParams.has(k))) return;
+
   // Live services — always network, fall back to cache only if offline.
   const NETWORK_ONLY = ['router.project-osrm.org','api.mapbox.com','api.open-meteo.com','files.sfchronicle.com'];
-  if (NETWORK_ONLY.some((h) => url.hostname.includes(h))) {
-    event.respondWith(fetch(req).catch(() => caches.match(req)));
+  if (NETWORK_ONLY.some((h) => url.hostname === h)) {
+    event.respondWith(fetch(req));
     return;
   }
 

@@ -16,7 +16,7 @@
 </head>
 <body>
   <h1>Privacy Policy — Chudridez</h1>
-  <p class="muted">Last updated: 23 July 2026</p>
+  <p class="muted">Last updated: 12 November 2026</p>
 
   <p>Chudridez is a free tool for planning Bay Area bicycle rides paired with food and drink stops.
   We aim to collect as little as possible. In short: <strong>Chudridez does not collect,
@@ -28,15 +28,14 @@
 
   <h2>Information stored on your device</h2>
   <p>To make the app useful, some information is saved locally in your browser or app storage
-  (using <code>localStorage</code>) and never leaves your device:</p>
+  (using <code>localStorage</code>):</p>
   <ul>
     <li>Your bucket list of saved rides and food stops.</li>
     <li>Any rides (GPX) or food stops you add yourself.</li>
     <li>Cached map routes and preferences, so the app loads faster and works offline.</li>
-    <li>An optional Mapbox access token, if you choose to enter one, stored only in your browser.</li>
+    <li>An optional public Mapbox access token is held for the current page, or saved in this browser if you select “Remember on this browser.” It is sent to Mapbox with directions requests. Use “Remove token” in Navigation settings to remove it.</li>
   </ul>
-  <p>You can clear all of this at any time using your browser/app settings, or the app's
-  &ldquo;Clear mine&rdquo; control.</p>
+  <p>You can clear all of this at any time using your browser/app settings, or the relevant in-app removal controls.</p>
 
   <h2>Location</h2>
   <p>If you use turn-by-turn or &ldquo;Follow GPS&rdquo; navigation, the app reads your device
@@ -48,8 +47,8 @@
   routes a ride, standard web requests (which may include your IP address and the map area or
   coordinates being requested) are sent to these providers, each governed by its own privacy policy:</p>
   <ul>
-    <li>Map tiles: CARTO, Esri, and AWS terrain tiles.</li>
-    <li>Route calculation: the public OSRM router (and, only if you add a token, the Mapbox Directions API).</li>
+    <li>Map tiles: OpenFreeMap (OpenMapTiles and OpenStreetMap data), Esri, and AWS terrain tiles.</li>
+    <li>Route calculation: the public OSRM router for car-route previews, and the Mapbox Directions API for cycling navigation if you add a public token. “Open in Google Maps” sends the selected route points to Google Maps only when you follow that link.</li>
     <li>Elevation data: Open-Meteo.</li>
     <li>Restaurant data: the San Francisco Chronicle&rsquo;s public restaurant map feed.</li>
   </ul>

@@ -2,6 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
+<meta name="referrer" content="origin" />
+<script>
+// Never consume credentials from share links. Scrub legacy query parameters
+// before loading third-party resources or registering the service worker.
+try {
+  const clean = new URL(location.href);
+  ['token', 'access_token', 'api_key'].forEach(key => clean.searchParams.delete(key));
+  if (clean.href !== location.href) history.replaceState(history.state, '', clean.href);
+} catch (_) {}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
@@ -311,6 +321,7 @@
       </div>
       <button id="installBtn" onclick="chudInstall()" class="modebtn" style="display:none;width:100%;margin-top:7px">⬇︎ Install Chudridez app</button>
     </div>
+    <div class="grp"><button id="navToken" class="modebtn" style="width:100%">⚙ Navigation settings</button></div>
     <div class="grp">
       <div class="lbl">Sort routes</div>
       <select class="sel" id="sortSel">
@@ -341,14 +352,18 @@
 <div class="navsheet" id="navSheet" hidden></div>
 <div class="navbanner" id="navBanner" hidden><div class="nb-ic" id="nbIc">↑</div><div class="nb-main"><div class="nb-dist" id="nbDist"></div><div class="nb-txt" id="nbTxt"></div></div><button id="navStop" title="Stop navigation">✕</button></div>
 <button class="recenterbtn" id="recenterBtn" hidden>◎ Re-center</button>
-<div class="tokenmodal" id="tokenModal" hidden>
+<div class="tokenmodal" id="tokenModal" role="dialog" aria-modal="true" aria-labelledby="tokenTitle" hidden>
   <div class="tm-card">
-    <div class="tm-hd">Live navigation <span id="tmClose">✕</span></div>
-    <p class="tm-p">Navigation works <b>keyless</b> out of the box. For cycling-grade turns &amp; smoother rerouting, add a free Mapbox token (optional — it's stored only in this browser).</p>
-    <a class="minibtn" id="tmGet" href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener">Get a free token ↗</a>
-    <input id="tokenInput" class="tm-in" placeholder="pk.eyJ… paste token here" autocomplete="off" spellcheck="false"/>
-    <div class="tm-actions"><button id="tmSave" class="minibtn on">Save token</button><button id="tmSkip" class="minibtn">Skip — use keyless</button><button id="tmClear" class="minibtn">Remove</button></div>
-    <div class="tm-hint">You don't need a token — tap Skip and just use ▶ Live nav.</div>
+    <div class="tm-hd"><span id="tokenTitle">Cycling navigation</span><button id="tmClose" class="minibtn" aria-label="Close navigation settings">✕</button></div>
+    <p class="tm-p">The map and ride search need no API key. In-app cycling navigation uses your own <b>public Mapbox token (pk.)</b>. Never enter a secret token or another provider's API key.</p>
+    <a class="minibtn" href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener noreferrer">Manage Mapbox tokens ↗</a>
+    <p class="tm-hint">Use a dedicated public token restricted to https://esigel-stax.github.io. Mapbox usage and billing limits apply. Tokens are sent only to Mapbox to request directions.</p>
+    <label for="tokenInput" class="tm-hint">Public Mapbox token</label>
+    <input id="tokenInput" type="password" class="tm-in" placeholder="pk.…" autocomplete="off" spellcheck="false" aria-describedby="tokenFeedback"/>
+    <label class="tm-hint"><input id="tokenRemember" type="checkbox"/> Remember on this browser</label>
+    <p id="tokenFeedback" class="tm-hint" role="status" aria-live="polite"></p>
+    <div class="tm-actions"><button id="tmSave" class="minibtn on">Check &amp; use token</button><button id="tmSkip" class="minibtn">Close</button><button id="tmClear" class="minibtn">Remove token</button></div>
+    <div class="tm-hint">Without a token, use a route's “Open in Google Maps” link for cycling directions. Keyless OSRM previews are car routes, not cycling guidance.</div>
   </div>
 </div>
 <div class="bucketpage" id="bucketPage" hidden>
@@ -357,6 +372,8 @@
 </div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="data.js?v=4"></script>
+<script src="routing-core.js?v=6"></script>
+<script src="basemap-style.js?v=6"></script>
 <script>
 (function(){
   const SAFETY=window.SAFETY, ROUTES=window.ROUTES, RESTAURANTS=window.RESTAURANTS, FOOD_TYPES=window.FOOD_TYPES, CHRONICLE=window.CHRONICLE100||[];
@@ -381,21 +398,17 @@
   function isPinned(n){ return !!bucket[n]; }
   function togglePin(n){ if(bucket[n]){ delete bucket[n]; if(customView===n) clearCustom(); } else { bucket[n]={stops:[]}; } saveBucket(); renderBucket(); renderList(); }
   // ---------- base style ----------
-  const style={
-    version:8,
-    glyphs:'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-    sources:{
-      carto:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],tileSize:256,attribution:'© OpenStreetMap © CARTO'},
-      sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'© Esri, Maxar'},
-      dem:{type:'raster-dem',tiles:['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'],tileSize:256,encoding:'terrarium',maxzoom:14}
-    },
-    layers:[
-      {id:'bg',type:'background',paint:{'background-color':'#0e0a07'}},
-      {id:'carto',type:'raster',source:'carto'},
-      {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'}},
-      {id:'hillshade',type:'hillshade',source:'dem',layout:{visibility:'none'},paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#000'}}
-    ]
-  };
+  // OpenFreeMap is keyless. Keep a local style snapshot so styling is stable
+  // and can load from the app-shell cache, while tiles stay with their provider.
+  const style=JSON.parse(JSON.stringify(window.CHUD_BASE_STYLE));
+  const baseLayers=style.layers.map(layer=>({id:layer.id,visibility:(layer.layout&&layer.layout.visibility)||'visible'}));
+  style.sources.sat={type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'© Esri, Maxar'};
+  style.sources.dem={type:'raster-dem',tiles:['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'],tileSize:256,encoding:'terrarium',maxzoom:14};
+  style.sources.hillshadeDem={...style.sources.dem};
+  style.layers.push(
+    {id:'sat',type:'raster',source:'sat',layout:{visibility:'none'}},
+    {id:'hillshade',type:'hillshade',source:'hillshadeDem',layout:{visibility:'none'},paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#000'}}
+  );
   const map=new maplibregl.Map({container:'map',style,center:[-122.2,37.6],zoom:8.3,pitch:0,bearing:0,maxPitch:80,attributionControl:false});
   map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
   map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');
@@ -411,8 +424,6 @@
   const topFeatures = CHRONICLE.map(c=>({type:'Feature',geometry:{type:'Point',coordinates:[c.lng,c.lat]},properties:{rank:c.rank,name:c.name,cuisine:c.cuisine,price:c.price,locality:c.locality,region:c.region}}));
   const fc=f=>({type:'FeatureCollection',features:f});
   map.on('load',()=>{
-    // sky (used in 3D) — wrapped so an unsupported build can't abort the rest of setup
-    try{ map.addLayer({id:'sky',type:'sky',paint:{'sky-type':'atmosphere','sky-atmosphere-sun':[0.0,90.0],'sky-atmosphere-sun-intensity':6}}); }catch(e){}
     map.addSource('routes',{type:'geojson',data:fc(routeFeatures)});
     map.addSource('starts',{type:'geojson',data:fc(startFeatures)});
     map.addSource('food',{type:'geojson',data:fc(foodFeatures)});
@@ -609,7 +620,7 @@
     document.getElementById('btn3d').addEventListener('click',()=>setMode('3d'));
     const sh=document.getElementById('sheetHandle');
     if(sh) sh.addEventListener('click',()=>{ const p=document.getElementById('panel'); p.classList.toggle('open'); });
-    document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ ['tokenModal','stopPicker'].forEach(id=>{const el=document.getElementById(id); if(el)el.hidden=true;}); } });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeTokenModal(); document.getElementById('stopPicker').hidden=true; } });
     wireSearch();
   }
   function syncPills(){
@@ -674,7 +685,7 @@
     document.getElementById('btnSat').classList.toggle('on',m==='sat');
     document.getElementById('btn3d').classList.toggle('on',m==='3d');
     const sat=(m==='sat');                    // satellite is its own base; 3D keeps the dark tiki base
-    map.setLayoutProperty('carto','visibility',sat?'none':'visible');
+    baseLayers.forEach(layer=>map.setLayoutProperty(layer.id,'visibility',sat?'none':layer.visibility));
     map.setLayoutProperty('sat','visibility',sat?'visible':'none');
     const threeD=(m==='3d');
     map.setLayoutProperty('hillshade','visibility',threeD?'visible':'none');
@@ -1087,7 +1098,7 @@
     status('GPX downloaded ✓'); setTimeout(()=>status(''),2200);
   }
   // ---- turn-by-turn cue sheet (OSRM steps) + live follow + voice ----
-  let navWatch=null, navSteps=[], navActive=-1, navVoice=false, navMarker=null, navRouteName=null;
+  let navWatch=null, navSteps=[], navActive=-1, navVoice=false, navMarker=null, navRouteName=null, navCycling=false, navGeneration=0, navSheetVersion=0;
   function waypointsFor(name){ const rt=ROUTES.find(x=>x.name===name); const path=rt.path.map(p=>[p[1],p[0]]);
     const b=bucket[name]; if(b&&(b.stops||[]).length){ const ordered=b.stops.map(s=>({s,idx:nearestIdx(rt.path,s.lat,s.lng)})).sort((a,b)=>a.idx-b.idx);
       let coords=[],si=0; for(let i=0;i<path.length;i++){ coords.push(path[i]); while(si<ordered.length&&ordered[si].idx===i){ coords.push([ordered[si].s.lng,ordered[si].s.lat]); si++; } } while(si<ordered.length){ coords.push([ordered[si].s.lng,ordered[si].s.lat]); si++; } return coords; }
@@ -1102,24 +1113,44 @@
       case 'roundabout':case 'rotary':return 'Enter the roundabout'+r; case 'continue':return 'Continue'+(mod&&mod!=='straight'?(' '+mod):'')+r;
       case 'new name':return 'Continue'+r; default:return (m.type.charAt(0).toUpperCase()+m.type.slice(1))+r; } }
   function speak(t){ try{ const u=new SpeechSynthesisUtterance(t); speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){} }
+  function cyclingMapLink(coords){
+    const first=coords[0], last=coords[coords.length-1];
+    const url=new URL('https://www.google.com/maps/dir/');
+    url.searchParams.set('api','1'); url.searchParams.set('travelmode','bicycling');
+    url.searchParams.set('origin',first[1]+','+first[0]); url.searchParams.set('destination',last[1]+','+last[0]);
+    // Maps supports up to three waypoints on mobile browsers. This is a separate
+    // directions service, not an exact copy of the curated Chudridez route.
+    const via=coords.slice(1,-1).slice(0,3); if(via.length) url.searchParams.set('waypoints',via.map(c=>c[1]+','+c[0]).join('|'));
+    return '<a class="minibtn" href="'+url.href.replace(/&/g,'&amp;')+'" target="_blank" rel="noopener noreferrer">Open in Google Maps ↗</a> <small>(separate cycling route; verify stops)</small>';
+  }
   async function openNav(coords,title){
+    stopLiveNav(); navCycling=false;
+    const operation=++navSheetVersion, usingCycling=!!mbToken();
     const box=document.getElementById('navSheet'); box.hidden=false; navActive=-1; navRouteName=title;
     box.innerHTML='<div class="nav-hd">🧭 '+title+'<span id="navClose">✕</span></div><div class="nav-sub">Fetching directions…</div>';
     try{
-      const j=await fetch('https://router.project-osrm.org/route/v1/driving/'+coords.map(c=>c[0]+','+c[1]).join(';')+'?overview=false&steps=true').then(r=>r.ok?r.json():null);
-      const legs=j&&j.routes&&j.routes[0]&&j.routes[0].legs; if(!legs) throw 0;
+      const route=await fetchRoute(coords);
+      if(operation!==navSheetVersion || box.hidden) return;
+      navCycling=usingCycling;
+      const legs=route&&route.legs; if(!legs) throw new Error('Directions service unavailable. Try again later.');
       navSteps=[]; legs.forEach(l=>l.steps.forEach(s=>navSteps.push(s)));
-      const total=(j.routes[0].distance/1609.34).toFixed(1);
+      const total=(route.distance/1609.34).toFixed(1);
       box.innerHTML='<div class="nav-hd">🧭 '+title+'<span id="navClose">✕</span></div>'+
-        '<div class="nav-sub">'+total+' mi · '+navSteps.length+' cues <button id="navLive" class="minibtn">▶ Live nav</button> <button id="navFollow" class="minibtn">◉ Follow GPS</button> <button id="navVoice" class="minibtn">🔊 Voice</button> <button id="navToken" class="minibtn">⚙</button></div>'+
+        '<div class="nav-sub">'+total+' mi · '+navSteps.length+' cues <button id="navLive" class="minibtn">▶ Live nav</button> <button id="navFollow" class="minibtn" '+(navCycling?'':'disabled')+'>◉ Follow GPS</button> <button id="navVoice" class="minibtn" '+(navCycling?'':'disabled')+'>🔊 Voice</button> <button data-nav-token class="minibtn">⚙ Navigation settings</button></div>'+
+        '<div class="nav-sub">'+(navCycling?'Mapbox cycling directions':'OSRM car-route preview only. Not cycling-safe guidance.')+' · '+cyclingMapLink(coords)+'</div>'+
         '<div class="cues">'+navSteps.map((s,i)=>`<div class="cue" data-cue="${i}"><div class="cue-ic">${cueIcon(s.maneuver)}</div><div><div class="cue-t">${cueText(s.maneuver,s.name)}</div><div class="cue-d">${fmtDist(s.distance)}</div></div></div>`).join('')+'</div>';
-    }catch(e){ box.innerHTML='<div class="nav-hd">🧭 '+title+'<span id="navClose">✕</span></div><div class="nav-sub">Directions unavailable right now — try again in a moment.</div>'; }
+    }catch(e){
+      if(operation!==navSheetVersion || box.hidden) return;
+      box.innerHTML='<div class="nav-hd">🧭 '+title+'<span id="navClose">✕</span></div><div class="nav-sub" id="navError"></div><div class="nav-sub"><button data-nav-token class="minibtn">⚙ Navigation settings</button> '+cyclingMapLink(coords)+'</div>';
+      document.getElementById('navError').textContent=e.message || 'Directions unavailable right now.';
+    }
   }
   function setActiveCue(i){ if(i===navActive||i<0) return; navActive=i;
     document.querySelectorAll('.cue').forEach(c=>c.classList.toggle('active',+c.dataset.cue===i));
     const el=document.querySelector('.cue.active'); if(el) el.scrollIntoView({block:'center',behavior:'smooth'});
-    if(navVoice && navSteps[i]) speak(cueText(navSteps[i].maneuver,navSteps[i].name)); }
+    if(navCycling && navVoice && navSteps[i]) speak(cueText(navSteps[i].maneuver,navSteps[i].name)); }
   function toggleFollow(btn){
+    if(!navCycling || !mbToken()) return;
     if(navWatch!=null){ navigator.geolocation.clearWatch(navWatch); navWatch=null; btn&&btn.classList.remove('on'); if(navMarker){navMarker.remove();navMarker=null;} return; }
     if(!navigator.geolocation){ status('No GPS on this device'); setTimeout(()=>status(''),2500); return; }
     btn&&btn.classList.add('on');
@@ -1139,7 +1170,7 @@
   async function fetchOSRM(coords){
     try{ const j=await fetch('https://router.project-osrm.org/route/v1/driving/'+coords.map(c=>c[0]+','+c[1]).join(';')+'?overview=full&geometries=geojson&steps=true').then(r=>r.ok?r.json():null); if(j&&j.routes&&j.routes[0]) return j.routes[0]; }catch(e){} return null;
   }
-  async function fetchRoute(coords){ const tok=mbToken(); if(tok){ const r=await fetchMapbox(coords,tok); if(r) return r; } return await fetchOSRM(coords); }
+  async function fetchRoute(coords){ const tok=mbToken(); if(tok) return await fetchMapbox(coords,tok); return await fetchOSRM(coords); }
   // hide everything except the active route while navigating
   const NAV_HIDE=['routes-line','routes-casing','route-starts','route-bikes','food','top100','top100-lbl','recs-cluster','recs-count','recs-pt'];
   function setNavIsolation(on){
@@ -1149,23 +1180,54 @@
   function bearingDeg(lat1,lng1,lat2,lng2){ const toR=x=>x*Math.PI/180,toD=x=>x*180/Math.PI;
     const y=Math.sin(toR(lng2-lng1))*Math.cos(toR(lat2)); const x=Math.cos(toR(lat1))*Math.sin(toR(lat2))-Math.sin(toR(lat1))*Math.cos(toR(lat2))*Math.cos(toR(lng2-lng1));
     return (toD(Math.atan2(y,x))+360)%360; }
-  function mbToken(){ try{ return (new URLSearchParams(location.search).get('token')) || localStorage.getItem('mapbox_token') || ''; }catch(e){ return ''; } }
+  let tokenStorage; try { tokenStorage = localStorage; } catch (_) {}
+  const tokenStore = ChudRouting.createTokenStore(tokenStorage);
+  let tokenOperation = 0;
+  function mbToken(){ return tokenStore.get(); }
+  function tokenFeedback(message){ document.getElementById('tokenFeedback').textContent=message; }
+  function closeTokenModal(){ tokenOperation++; document.getElementById('tokenModal').hidden=true; document.getElementById('tokenInput').value=''; document.getElementById('tmSave').disabled=false; }
+
   function openTokenModal(){
-    const m=document.getElementById('tokenModal'); document.getElementById('tokenInput').value=mbToken()||''; m.hidden=false;
-    const close=()=>{ m.hidden=true; };
-    // direct handlers so the buttons work even if event delegation is interfered with
-    const wire=(id,fn)=>{ const el=document.getElementById(id); if(el) el.onclick=fn; };
-    wire('tmClose',close); wire('tmSkip',close); wire('tmSave',()=>saveToken()); wire('tmClear',()=>clearToken());
-    m.onclick=(e)=>{ if(e.target===m) close(); };
+    tokenOperation++;
+    const m=document.getElementById('tokenModal');
+    document.getElementById('tokenInput').value=mbToken();
+    document.getElementById('tokenRemember').checked=tokenStore.remembered();
+    document.getElementById('tmSave').disabled=false;
+    tokenFeedback(mbToken()?'A public token is configured. Check it again if cycling directions fail.':'No token configured. Browsing and search work without one.');
+    m.hidden=false; document.getElementById('tokenInput').focus();
   }
-  function saveToken(){ const v=document.getElementById('tokenInput').value.trim(); try{ if(v) localStorage.setItem('mapbox_token',v); }catch(e){} document.getElementById('tokenModal').hidden=true; status(v?'Mapbox token saved ✓ — Live nav will use it':'No token entered'); setTimeout(()=>status(''),2600); }
-  function clearToken(){ try{ localStorage.removeItem('mapbox_token'); }catch(e){} const i=document.getElementById('tokenInput'); if(i) i.value=''; status('Token removed — using keyless routing'); setTimeout(()=>status(''),2600); }
+  async function saveToken(){
+    const input=document.getElementById('tokenInput');
+    const value=input.value.trim(), error=ChudRouting.tokenError(value);
+    if(error){ tokenFeedback(error); return; }
+    const remember=document.getElementById('tokenRemember').checked;
+    const operation=++tokenOperation;
+    document.getElementById('tmSave').disabled=true;
+    tokenFeedback('Checking Mapbox cycling access…');
+    try {
+      // A fixed public test route. Never request GPS to validate a token.
+      await ChudRouting.fetchCyclingRoute([[-122.45,37.77],[-122.46,37.77]],value,fetch);
+      if(operation!==tokenOperation) return;
+      let saved;
+      try { saved=tokenStore.set(value,remember); }
+      catch (_) { tokenFeedback('Browser storage is blocked. Enable site storage or clear the old token in browser settings, then try again.'); return; }
+      input.value='';
+      tokenFeedback(saved.remembered?'Token checked and saved on this browser.':'Token checked and active for this page only.'+(remember?' Browser storage was unavailable; it was not saved.':''));
+      if(navRouteName) openNav(waypointsFor(navRouteName),navRouteName);
+    } catch(error) { if(operation===tokenOperation) tokenFeedback(error.message); }
+    finally { if(operation===tokenOperation) document.getElementById('tmSave').disabled=false; }
+  }
+  function clearToken(){
+    tokenOperation++;
+    const removed=tokenStore.clear();
+    document.getElementById('tokenInput').value=''; document.getElementById('tokenRemember').checked=false;
+    document.getElementById('tmSave').disabled=false;
+    stopLiveNav();
+    tokenFeedback(removed?'Token removed. Browsing and keyless route previews still work.':'Token disabled for this page. Browser storage is blocked; clear site data to remove any previously saved copy.');
+    if(navRouteName) openNav(waypointsFor(navRouteName),navRouteName);
+  }
   function minDistCoords(coords,lng,lat){ let m=Infinity; for(const c of coords){ const d=haversineMi(lng,lat,c[0],c[1]); if(d<m)m=d; } return m; }
-  async function fetchMapbox(coords,tok){
-    const path=coords.map(c=>c[0]+','+c[1]).join(';');
-    const url=`https://api.mapbox.com/directions/v5/mapbox/cycling/${path}?geometries=geojson&overview=full&steps=true&voice_instructions=true&banner_instructions=true&voice_units=imperial&access_token=${tok}`;
-    try{ const j=await fetch(url).then(r=>r.json()); if(j&&j.routes&&j.routes[0]) return j.routes[0]; if(j&&j.message) status('Mapbox: '+j.message); }catch(e){} return null;
-  }
+  async function fetchMapbox(coords,tok){ return ChudRouting.fetchCyclingRoute(coords,tok,fetch); }
   function applyLiveRoute(route){
     liveSteps=[]; route.legs.forEach(l=>l.steps.forEach(s=>liveSteps.push(s))); navSteps=liveSteps; liveSpoken=new Set();
     liveGeom=route.geometry.coordinates;
@@ -1175,9 +1237,13 @@
   }
   async function startLiveNav(){
     if(!navRouteName) return;
+    if(!mbToken()){ openTokenModal(); tokenFeedback('Add a public Mapbox token for in-app cycling navigation, or use Open in Google Maps without a token.'); return; }
+    stopLiveNav();
+    const generation=navGeneration;
     const wps=waypointsFor(navRouteName); liveDest=wps[wps.length-1];
     status(mbToken()?'Starting live navigation (Mapbox)…':'Starting live navigation…');
-    const route=await fetchRoute(wps);
+    let route; try { route=await fetchRoute(wps); } catch(error) { if(generation===navGeneration){ openTokenModal(); tokenFeedback(error.message); } return; }
+    if(generation!==navGeneration || !mbToken() || !navRouteName) return;
     if(!route){ status('Couldn’t start navigation — routing offline.'); setTimeout(()=>status(''),3000); return; }
     applyLiveRoute(route); status('');
     setNavIsolation(true);           // show only the route you're on
@@ -1189,6 +1255,10 @@
     liveWatch=navigator.geolocation.watchPosition(onLivePos, ()=>{ status('GPS permission blocked'); setTimeout(()=>status(''),3000); }, {enableHighAccuracy:true,maximumAge:1500,timeout:12000});
   }
   function stopLiveNav(){
+    navGeneration++;
+    if(navWatch!=null){ navigator.geolocation.clearWatch(navWatch); navWatch=null; }
+    navVoice=false; try { speechSynthesis.cancel(); } catch (_) {}
+    ['navFollow','navVoice'].forEach(id=>{ const button=document.getElementById(id); if(button) button.classList.remove('on'); });
     if(liveWatch!=null){ navigator.geolocation.clearWatch(liveWatch); liveWatch=null; }
     if(navMarker){ navMarker.remove(); navMarker=null; }
     document.getElementById('navBanner').hidden=true;
@@ -1205,6 +1275,8 @@
     bd.textContent=fmtDist(distMi*1609.34);
   }
   async function onLivePos(pos){
+    if(liveWatch==null) return;
+    const generation=navGeneration;
     const lng=pos.coords.longitude, lat=pos.coords.latitude;
     if(!navMarker){ const el=document.createElement('div'); el.style.cssText='width:18px;height:18px;border-radius:50%;background:#38e1c6;border:3px solid #fff;box-shadow:0 0 12px rgba(56,225,198,.9)'; navMarker=new maplibregl.Marker({element:el}); }
     navMarker.setLngLat([lng,lat]).addTo(map);
@@ -1222,25 +1294,27 @@
     // off-route → reroute from here to destination
     if(liveGeom.length){
       const off = minDistCoords(liveGeom,lng,lat);
-      if(off>0.05){ if(++liveOff>=3){ liveOff=0; speak('Rerouting'); status('Rerouting…'); const r=await fetchRoute([[lng,lat],liveDest]); if(r){ applyLiveRoute(r); status(''); } } }
+      if(off>0.05){ if(++liveOff>=3){ liveOff=0; speak('Rerouting'); status('Rerouting…'); try { const r=await fetchRoute([[lng,lat],liveDest]); if(generation!==navGeneration || liveWatch==null) return; if(r){ applyLiveRoute(r); status(''); } } catch(error) { if(generation===navGeneration){ stopLiveNav(); openTokenModal(); tokenFeedback(error.message); } } } }
       else liveOff=0;
     }
   }
+  ['tokenInput','tokenRemember'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{ tokenOperation++; document.getElementById('tmSave').disabled=false; }));
+  document.getElementById('tokenInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!document.getElementById('tmSave').disabled){ e.preventDefault(); saveToken(); } });
   // delegated clicks: pins, bucket actions, stop picker, nav
   document.addEventListener('click', e=>{
     if(e.target.id==='navLive'){ startLiveNav(); return; }
     if(e.target.id==='navStop'){ stopLiveNav(); return; }
     if(e.target.id==='recenterBtn'){ followMode=true; showRecenter(false); if(lastLive) map.easeTo({center:lastLive,zoom:16,pitch:60,duration:600}); return; }
-    if(e.target.id==='navToken'){ openTokenModal(); return; }
-    if(e.target.id==='tmClose'||e.target.id==='tmSkip'||e.target.id==='tokenModal'){ document.getElementById('tokenModal').hidden=true; return; }
+    if(e.target.id==='navToken'||e.target.closest('[data-nav-token]')){ openTokenModal(); return; }
+    if(e.target.id==='tmClose'||e.target.id==='tmSkip'||e.target.id==='tokenModal'){ closeTokenModal(); return; }
     if(e.target.id==='tmSave'){ saveToken(); return; }
     if(e.target.id==='tmClear'){ clearToken(); return; }
     if(e.target.id==='shareBtn'){ shareList(); return; }
     if(e.target.id==='openBucket'){ const bp=document.getElementById('bucketPage'); bp.hidden=false; renderBucket(); closeSheet(); return; }
     if(e.target.id==='bpClose'){ document.getElementById('bucketPage').hidden=true; return; }
-    if(e.target.id==='navClose'){ stopLiveNav(); document.getElementById('navSheet').hidden=true; if(navWatch!=null){navigator.geolocation.clearWatch(navWatch);navWatch=null;} if(navMarker){navMarker.remove();navMarker=null;} navSteps=[]; navRouteName=null; return; }
+    if(e.target.id==='navClose'){ navSheetVersion++; stopLiveNav(); document.getElementById('navSheet').hidden=true; if(navWatch!=null){navigator.geolocation.clearWatch(navWatch);navWatch=null;} if(navMarker){navMarker.remove();navMarker=null;} navSteps=[]; navRouteName=null; return; }
     if(e.target.id==='navFollow'){ toggleFollow(e.target); return; }
-    if(e.target.id==='navVoice'){ navVoice=!navVoice; e.target.classList.toggle('on',navVoice); return; }
+    if(e.target.id==='navVoice'){ if(!navCycling || !mbToken()) return; navVoice=!navVoice; e.target.classList.toggle('on',navVoice); return; }
     const gx=e.target.closest('[data-gpx]'); if(gx){ e.stopPropagation(); exportGPX(gx.getAttribute('data-gpx')); return; }
     const nv=e.target.closest('[data-nav]'); if(nv){ e.stopPropagation(); openNav(waypointsFor(nv.getAttribute('data-nav')), nv.getAttribute('data-nav')); return; }
     const cue=e.target.closest('[data-cue]'); if(cue){ const s=navSteps[+cue.dataset.cue]; if(s&&s.maneuver&&s.maneuver.location) map.flyTo({center:s.maneuver.location,zoom:15}); return; }
