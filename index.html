@@ -142,6 +142,8 @@ try {
   .search .lbl .ai{background:linear-gradient(120deg,var(--accent),var(--accent2))!important;color:#2a1608!important}
   .pill:hover,.tog:hover,.modebtn:hover,.res:hover,.searchbox input:focus{border-color:var(--accent)}
   .maplibregl-popup-content{border-top:3px solid var(--accent)}
+  /* Keep controls and required basemap attribution clear of the desktop sidebar. */
+  .maplibregl-ctrl-bottom-right{right:362px}
   .maplibregl-ctrl-group{background:var(--glass2)!important;border:1px solid var(--line)!important}
   .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)!important}
   .maplibregl-ctrl button .maplibregl-ctrl-icon{filter:invert(1) hue-rotate(180deg) brightness(1.4) sepia(.3) saturate(2)}
@@ -257,6 +259,7 @@ try {
     .sheet-handle::before{content:'';position:absolute;top:8px;left:50%;transform:translateX(-50%);width:44px;height:4px;border-radius:2px;background:rgba(232,176,75,.55)}
     .panel .scroller{flex:1 1 auto;min-height:0;padding-top:10px}
     .list{max-height:30vh}
+    .maplibregl-ctrl-bottom-right{right:0}
     /* keep map controls above the collapsed sheet */
     .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left{bottom:62px!important}
     /* bigger tap targets */

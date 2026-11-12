@@ -1,9 +1,9 @@
-/* Chudridez service worker — v6
+/* Chudridez service worker — v7
    IMPORTANT CHANGE: the app shell (index.html, data.js, CSS/JS) is now NETWORK-FIRST,
    so when you're online you always get the latest deploy and never get trapped on a
    stale cached page. Map tiles stay cache-first (fast + offline). Bump CACHE_VERSION
    on any future deploy to force old caches to clear. */
-const CACHE_VERSION = 'chudridez-v6';
+const CACHE_VERSION = 'chudridez-v7';
 const SHELL  = `${CACHE_VERSION}-shell`;
 const RUNTIME = `${CACHE_VERSION}-runtime`;
 

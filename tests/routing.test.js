@@ -87,5 +87,5 @@ describe('keyless basemap',()=>{
     expect(JSON.stringify(style)).not.toMatch(/access_token|api_key|pk\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
     expect(html).toContain("sat?'none':layer.visibility");
   });
-  it('ships in the fresh service-worker shell',()=>{const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');expect(sw).toContain('chudridez-v6');expect(sw).toContain('./basemap-style.js?v=6');});
+  it('ships in the fresh service-worker shell',()=>{const sw=fs.readFileSync(new URL('../sw.js',import.meta.url),'utf8');expect(sw).toContain('chudridez-v7');expect(sw).toContain('./basemap-style.js?v=6');});
 });

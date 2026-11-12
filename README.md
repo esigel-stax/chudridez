@@ -15,7 +15,7 @@ Production serves the repository root on the `main` branch; no build secrets are
 
 The old CARTO raster URLs now return “API KEY REQUIRED” placeholder images. The app uses [OpenFreeMap](https://openfreemap.org/) public vector tiles instead, retaining a dark style and the Map, Satellite, and 3D terrain modes. No account, API key, or payment is needed for the basemap. The provider has no availability SLA.
 
-`basemap-style.js` is a local snapshot of the provider's dark style. Its license is in `BASEMAP-LICENSE.md`; source attribution is displayed on the map. Service-worker v6 clears the old cached placeholder tiles.
+`basemap-style.js` is a local snapshot of the provider's dark style. Its license is in `BASEMAP-LICENSE.md`; source attribution is displayed on the map. Service-worker v7 clears the old cached placeholder tiles.
 
 ## Navigation tokens
 
